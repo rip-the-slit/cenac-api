@@ -12,12 +12,12 @@ CREATE TABLE IF NOT EXISTS user (
 );
 
 CREATE TABLE IF NOT EXISTS year (
-    id TEXT PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS subject (
-    id TEXT PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     minimum_grade REAL
 );
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS student (
 
 CREATE TABLE IF NOT EXISTS period (
     id TEXT PRIMARY KEY,
-    status TEXT,
+    status TEXT DEFAULT "new",
     start_year INTEGER,
     end_year INTEGER,
     opening_date DATE,
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS period (
 
 CREATE TABLE IF NOT EXISTS year_period (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    year_id TEXT,
+    year_id INTEGER,
     period_id TEXT,
     UNIQUE (year_id, period_id),
     FOREIGN KEY (year_id) REFERENCES year(id),
@@ -66,32 +66,34 @@ CREATE TABLE IF NOT EXISTS year_period (
 
 CREATE TABLE IF NOT EXISTS year_subject (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    year_period_id TEXT,
-    subject_id TEXT,
+    year_period_id INTEGER,
+    subject_id INTEGER,
     UNIQUE (year_period_id, subject_id),
     FOREIGN KEY (year_period_id) REFERENCES year_period(id),
     FOREIGN KEY (subject_id) REFERENCES subject(id)
 );
 
 CREATE TABLE IF NOT EXISTS class (
-    id TEXT PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    year_period_id INTEGER,
     shift TEXT,
     location TEXT,
     capacity INTEGER,
-    year_period_id TEXT,
+    UNIQUE (name, year_period_id),
     FOREIGN KEY (year_period_id) REFERENCES year_period(id)
 );
 
 CREATE TABLE IF NOT EXISTS grade (
-    id TEXT PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     term TEXT,
     value REAL,
     strategy TEXT,
     student_id TEXT,
-    year_subject_id TEXT,
+    year_subject_id INTEGER,
     UNIQUE (term, year_subject_id, student_id),
     FOREIGN KEY (student_id) REFERENCES student(id),
-    FOREIGN KEY (year_subject_id) REFERENCES year_subject(id),
+    FOREIGN KEY (year_subject_id) REFERENCES year_subject(id)
 );
 
 CREATE TABLE IF NOT EXISTS student_guardian (
@@ -104,7 +106,7 @@ CREATE TABLE IF NOT EXISTS student_guardian (
 
 CREATE TABLE IF NOT EXISTS student_class (
     student_id TEXT,
-    class_id TEXT,
+    class_id INTEGER,
     status TEXT,
     PRIMARY KEY (student_id, class_id),
     FOREIGN KEY (student_id) REFERENCES student(id),
@@ -113,7 +115,7 @@ CREATE TABLE IF NOT EXISTS student_class (
 
 CREATE TABLE IF NOT EXISTS teacher_subject (
     teacher_id TEXT,
-    year_subject_id TEXT,
+    year_subject_id INTEGER,
     PRIMARY KEY (teacher_id, year_subject_id),
     FOREIGN KEY (teacher_id) REFERENCES teacher(id),
     FOREIGN KEY (year_subject_id) REFERENCES year_subject(id)

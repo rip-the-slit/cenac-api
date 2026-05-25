@@ -66,8 +66,9 @@ export class Period {
 }
 
 export class Class {
-  constructor(id, shift, location, capacity, yearPeriodId) {
+  constructor(id, name, shift, location, capacity, yearPeriodId) {
     this.id = id;
+    this.name = name;
     this.shift = shift;
     this.location = location;
     this.capacity = capacity;
