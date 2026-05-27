@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS year (
 CREATE TABLE IF NOT EXISTS subject (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
+    abbr TEXT,
     minimum_grade REAL
 );
 
@@ -86,12 +87,12 @@ CREATE TABLE IF NOT EXISTS class (
 
 CREATE TABLE IF NOT EXISTS grade (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    term TEXT,
+    term INTEGER,
+    strategy INTEGER,
     value REAL,
-    strategy TEXT,
     student_id TEXT,
     year_subject_id INTEGER,
-    UNIQUE (term, year_subject_id, student_id),
+    UNIQUE (term, strategy, year_subject_id, student_id),
     FOREIGN KEY (student_id) REFERENCES student(id),
     FOREIGN KEY (year_subject_id) REFERENCES year_subject(id)
 );

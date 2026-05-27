@@ -92,14 +92,14 @@ class YearRepository {
 
   findAllAssignedSubjects(yearPeriodId) {
     const query = this.db.prepare(
-      `SELECT subject.id, subject.name, subject.minimum_grade as "minimumGrade", year_subject.id as "yearSubjectId"
+      `SELECT subject.id, subject.name, subject.abbr, subject.minimum_grade as "minimumGrade", year_subject.id as "yearSubjectId"
       FROM year_subject JOIN subject ON year_subject.subject_id = subject.id 
       WHERE year_subject.year_period_id = CAST(? AS INTEGER)`
     );
     const results = query.all(yearPeriodId);
     return results.map(
       (row) =>
-        new Subject(row.id, row.name, row.minimumGrade, row.yearSubjectId)
+        new Subject(row.id, row.name, row.abbr, row.minimumGrade, row.yearSubjectId)
     );
   }
 }
