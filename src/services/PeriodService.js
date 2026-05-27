@@ -57,7 +57,7 @@ class PeriodService {
       if (!result[yp.yearId]) result[yp.yearId] = [];
       for (const cls of classes) {
         if (!result[yp.yearId].includes(cls.id)) {
-          result[yp.yearId].push(cls.id);
+          result[yp.yearId].push(cls.name);
         }
       }
     }
@@ -83,7 +83,7 @@ class PeriodService {
     };
 
     const yearPeriods = this.periodRepository.findAllAssignedYears(periodId);
-    const students = [];
+    const rows = [];
 
     for (const yp of yearPeriods) {
       if (f.year && String(yp.yearId) !== f.year) continue;
@@ -102,20 +102,26 @@ class PeriodService {
           if (f.dateOfBirth && !normalize(student.birthDate).includes(f.dateOfBirth))        continue;
           if (f.birthPlace  && !normalize(student.birthPlace).includes(f.birthPlace))        continue;
 
-          students.push({
+          rows.push({
             id:         student.id,
             firstName:  student.firstName,
             lastName:   student.lastName,
             birthDate:  student.birthDate,
             birthPlace: student.birthPlace,
             status:     student.status,
-            _class: { id: cls.id, year: yp.yearId },
+            _class: { id: cls.name, year: yp.yearId },
           });
         }
       }
     }
 
-    return students;
+    return {rows, years: this.yearRepository.findAll(), classesByYear: this.getClassesByYear(periodId), studentFieldLabels: {
+      id: "Cédula",
+      firstName: "Nombres",
+      lastName: "Apellidos",
+      birthDate: "Fecha de Nacimiento",
+      birthPlace: "Lugar de Nacimiento",
+    }};
   }
 
   getStudentById(periodId, studentId) {
@@ -125,28 +131,13 @@ class PeriodService {
     const student = this.studentRepository.findById(studentId);
     if (!student) throw new Error("Estudiante no registrado");
 
-    const yearPeriods = this.periodRepository.findAllAssignedYears(periodId);
-
-    for (const yp of yearPeriods) {
-      const classes = this.yearRepository.findAllAssignedClasses(yp.id);
-      for (const cls of classes) {
-        const classStudents = this.studentRepository.findAllByClass(cls.id);
-        const found = classStudents.find((s) => String(s.id) === String(studentId));
-        if (found) {
-          return {
-            id:         found.id,
-            firstName:  found.firstName,
-            lastName:   found.lastName,
-            birthDate:  found.birthDate,
-            birthPlace: found.birthPlace,
-            status:     found.status,
-            _class: { id: cls.id, year: yp.yearId },
-          };
-        }
-      }
-    }
-
-    throw new Error("Estudiante no encontrado en este periodo");
+    return {student, studentFieldLabels: {
+      id: "Cédula",
+      firstName: "Nombres",
+      lastName: "Apellidos",
+      birthDate: "Fecha de Nacimiento",
+      birthPlace: "Lugar de Nacimiento",
+    }};
   }
 
   // POST /periods/:id/load → loadPeriodData(periodId, students, subjectsPerYear)
@@ -210,7 +201,7 @@ class PeriodService {
         classMap.set(`${yp.id}-${className}`, existingClass)
       }
 
-      this.studentRepository.assignToClass(student.id, existingClass.id, student.status)
+      this.studentRepository.assignToClass(student.id, existingClass.id, "Reprobado")
     }
 
     this.periodRepository.update(periodId, { ...period, status: "loaded" });
