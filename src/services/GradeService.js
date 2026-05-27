@@ -92,7 +92,7 @@ class GradeService {
 
   // GET /grades?periodId&yearId&classId&subjectId&q
   // Mirrors getGrades() in db.js
-  getGrades(periodId, { yearId, classId, subjectId, q } = {}) {
+  getGrades(periodId, { yearId, classId, status, q } = {}) {
     const period = this.periodRepository.findById(periodId);
     if (!period) throw new Error("Periodo Escolar no registrado");
 
@@ -124,6 +124,7 @@ class GradeService {
       // Apply yearId / classId filters early
       if (yearId && String(student.yearId) !== String(yearId)) continue;
       if (classId && String(student.classId) !== String(classId)) continue;
+      if (status && student.status !== status) continue;
 
       // Apply text search filter
       if (
@@ -145,8 +146,6 @@ class GradeService {
       const bySubject = {};
 
       for (const sKey of allowedSubjects) {
-        if (subjectId && String(subjectId) !== sKey) continue;
-
         const yearSubjectId = yearSubjectMap.get(`${student.yearId}-${sKey}`);
         if (!yearSubjectId) continue;
 
@@ -182,9 +181,6 @@ class GradeService {
 
         bySubject[sKey] = { avg, terms, termAverages };
       }
-
-      // Skip student if filtering by subject and they have no matching grades
-      if (subjectId && !bySubject[String(subjectId)]) continue;
 
       const year = yearsById.get(student.yearId);
       rows.push({
@@ -231,6 +227,7 @@ class GradeService {
       years: allYears,
       classesByYear,
       subjectsById,
+      statuses: ["Aprobado", "Reprobado"],
     };
   }
 

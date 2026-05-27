@@ -7,9 +7,9 @@ class GradeController {
 
   getGrades(req, res) {
     try {
-      const { periodId, yearId, classId, subjectId, q } = req.query;
+      const { periodId, yearId, classId, status, q } = req.query;
       if (!periodId) return res.status(400).json({ error: "periodId es requerido" });
-      const data = this.gradeService.getGrades(periodId, { yearId, classId, subjectId, q });
+      const data = this.gradeService.getGrades(periodId, { yearId, classId, status, q });
       res.json(data);
     } catch (e) {
       res.status(404).json({ error: e.message });
