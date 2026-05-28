@@ -15,9 +15,10 @@ export class Year {
 }
 
 export class Subject {
-  constructor(id, name, minimumGrade, yearSubjectId) {
+  constructor(id, name, abbr, minimumGrade, yearSubjectId) {
     this.id = id;
     this.name = name;
+    this.abbr = abbr;
     this.minimumGrade = minimumGrade;
     this.yearSubjectId = yearSubjectId;
   }
