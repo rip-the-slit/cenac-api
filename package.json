@@ -4,13 +4,14 @@
     "dev": "nodemon ./src/app.js"
   },
   "dependencies": {
-    "better-sqlite3": "^12.10.0",
-    "cors": "^2.8.6",
-    "express": "^5.2.1",
-    "open": "^11.0.0",
-    "pkg": "^4.5.1"
+    "better-sqlite3": "^8.7.0",
+    "express": "^4.22.2",
+    "open": "^8.4.2"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "nodemon": "3.1.10"
+  },
+  "engines": {
+    "node": "16.6.2"
   }
 }
