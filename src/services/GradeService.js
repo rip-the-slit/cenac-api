@@ -4,6 +4,13 @@ import YearRepository from "../repositories/YearRepository.js";
 import StudentRepository from "../repositories/StudentRepository.js";
 import { Grade } from "../models/index.js";
 
+function toNumberOrNull(value) {
+  if (value === null || value === undefined || value === "") return null;
+
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 class GradeService {
   constructor(
     subjectRepository,
@@ -113,11 +120,6 @@ class GradeService {
         .toLowerCase()
         .trim();
     const query = normalize(q);
-    const toNumberOrNull = (value) => {
-      const n = Number(value);
-      return Number.isFinite(n) ? n : null;
-    };
-
     const rows = [];
 
     for (const student of studentsMeta) {
@@ -241,67 +243,71 @@ class GradeService {
     const period = this.periodRepository.findById(periodId);
     if (!period) throw new Error("Periodo Escolar no registrado");
 
-    const subjectsPerYear = this._getSubjectsPerYear(periodId);
-    const studentsMeta = this._getStudentsWithMeta(periodId);
-    const yearSubjectMap = this._getYearSubjectMap(periodId);
-    const studentsById = new Map(studentsMeta.map((s) => [s.id, s]));
+    return this.subjectRepository.db.transaction(() => {
+      const subjectsPerYear = this._getSubjectsPerYear(periodId);
+      const studentsMeta = this._getStudentsWithMeta(periodId);
+      const yearSubjectMap = this._getYearSubjectMap(periodId);
+      const studentsById = new Map(studentsMeta.map((s) => [s.id, s]));
 
-    let skipped = 0;
+      let skipped = 0;
 
-    for (const entry of grades) {
-      const student = studentsById.get(entry?.id);
-      if (!student || !entry?.subjects || typeof entry.subjects !== "object") {
-        skipped++;
-        continue;
-      }
+      for (const entry of grades) {
+        const student = studentsById.get(entry?.id);
+        if (!student || !entry?.subjects || typeof entry.subjects !== "object") {
+          skipped++;
+          continue;
+        }
 
-      const allowed = new Set(subjectsPerYear[String(student.yearId)] || []);
+        const allowed = new Set(subjectsPerYear[String(student.yearId)] || []);
 
-      for (const [rawSubjectId, terms] of Object.entries(entry.subjects)) {
-        const sKey = String(rawSubjectId);
-        if (!allowed.has(sKey) || !Array.isArray(terms)) continue;
+        for (const [rawSubjectId, terms] of Object.entries(entry.subjects)) {
+          const sKey = String(rawSubjectId);
+          if (!allowed.has(sKey) || !Array.isArray(terms)) continue;
 
-        const yearSubjectId = yearSubjectMap.get(`${student.yearId}-${sKey}`);
-        if (!yearSubjectId) continue;
+          const yearSubjectId = yearSubjectMap.get(`${student.yearId}-${sKey}`);
+          if (!yearSubjectId) continue;
 
-        terms.forEach((termGrades, termIndex) => {
-          const term = Number(termIndex + 1);
-          if (!Array.isArray(termGrades)) return;
+          terms.forEach((termGrades, termIndex) => {
+            const term = Number(termIndex + 1);
+            if (!Array.isArray(termGrades)) return;
 
-          termGrades.forEach((rawGrade, strategyIndex) => {
-            const isObj =
-              rawGrade &&
-              typeof rawGrade === "object" &&
-              !Array.isArray(rawGrade);
-            const rawValue = isObj ? rawGrade.value : rawGrade;
-            const parsed = Number(rawValue);
-            const value = Number.isFinite(parsed) ? parsed : null;
-            const strategy =
-              (isObj && Number(rawGrade.strategy)) || strategyIndex + 1;
-            const id = isObj ? rawGrade.id : null;
+            termGrades.forEach((rawGrade, strategyIndex) => {
+              const isObj =
+                rawGrade &&
+                typeof rawGrade === "object" &&
+                !Array.isArray(rawGrade);
+              const rawValue = isObj ? rawGrade.value : rawGrade;
+              const value = toNumberOrNull(rawValue);
+              const strategy =
+                (isObj && Number(rawGrade.strategy)) || strategyIndex + 1;
+              const id = isObj ? rawGrade.id : null;
 
-            const grade = new Grade(
-              id,
-              term,
-              value,
-              strategy,
-              student.id,
-              yearSubjectId
-            );
-            this.subjectRepository.assignGrade(grade);
+              const grade = new Grade(
+                id,
+                term,
+                value,
+                strategy,
+                student.id,
+                yearSubjectId
+              );
+
+              this.subjectRepository.assignGrade(grade);
+            });
           });
-        });
-      }
-      const newClassStatus = this._getStudentClassStatus(student.id, periodId);
-      this.studentRepository.updateClassStatus(
-        student.id,
-        newClassStatus.classId,
-        newClassStatus.status
-      );
-    }
+        }
 
-    return { loaded: grades.length - skipped, skipped };
+        const newClassStatus = this._getStudentClassStatus(student.id, periodId);
+        this.studentRepository.updateClassStatus(
+          student.id,
+          newClassStatus.classId,
+          newClassStatus.status
+        );
+      }
+
+      return { loaded: grades.length - skipped, skipped };
+    });
   }
+
 }
 
 export default new GradeService(
