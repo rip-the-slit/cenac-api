@@ -3,10 +3,11 @@ import fs from "fs";
 import path from "path";
 import getRelativeFilePath from "./getRelativeFilePath.js";
 
+const isTesting = process.env.NODE_ENV === "test"
 const dbPath = path.resolve("students.db");
 const SQL = await initSqlJs();
 
-const sqliteDb = fs.existsSync(dbPath)
+let sqliteDb = !isTesting && fs.existsSync(dbPath)
   ? new SQL.Database(fs.readFileSync(dbPath))
   : new SQL.Database();
 
@@ -14,7 +15,7 @@ let transactionDepth = 0;
 let pendingPersist = false;
 
 function writeDatabaseFile() {
-  fs.writeFileSync(dbPath, sqliteDb.export());
+  !isTesting && fs.writeFileSync(dbPath, sqliteDb.export());
 }
 
 function persist() {
@@ -82,7 +83,6 @@ class StatementAdapter {
       statement.bind(normalizeParams(params));
 
       while (statement.step()) {
-        // Exhaust the statement so SQLite applies the mutation fully.
       }
 
       const changes = this.database.getRowsModified();
@@ -100,6 +100,15 @@ class StatementAdapter {
 }
 
 const db = {
+  reset() {
+    if (!isTesting) return;
+
+    sqliteDb.close()
+    sqliteDb = new SQL.Database();
+    transactionDepth = 0;
+    pendingPersist = false;
+  },
+
   exec(sql) {
     const result = sqliteDb.exec(sql);
     persist();
