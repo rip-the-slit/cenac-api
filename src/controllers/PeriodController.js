@@ -70,6 +70,19 @@ class PeriodController {
     }
   }
 
+  addPeriod(req, res) {
+    try {
+      const period = req.body
+      if (typeof period !== "object") {
+        return res.status(400).json({ error: "body debe ser un objeto" });
+      }
+      const data = this.periodService.addPeriod(period);
+      res.status(201).json(data);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  }
+
   loadPeriodData(req, res) {
     try {
       const { students, subjects } = req.body;

@@ -9,6 +9,7 @@ router.get("/:id", (req, res) => PeriodController.getPeriodStats(req, res));
 router.get("/:id/classes", (req, res) => PeriodController.getClassesByYear(req, res));
 router.get("/:id/students", (req, res) => PeriodController.getStudentsByPeriod(req, res));
 router.get("/:id/students/:studentId",(req, res) => PeriodController.getStudentById(req, res));
+router.post("/", (req, res) => PeriodController.addPeriod(req, res))
 router.post("/:id/load", (req, res) => PeriodController.loadPeriodData(req, res));
 
 export default router;

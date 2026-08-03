@@ -1,7 +1,7 @@
 import PeriodRepository from "../repositories/PeriodRepository.js";
 import YearRepository from "../repositories/YearRepository.js";
 import StudentRepository from "../repositories/StudentRepository.js";
-import { Class, Student } from "../models/index.js";
+import { Class, Period, PeriodStats, Student } from "../models/index.js";
 
 class PeriodService {
   constructor(periodRepository, yearRepository, studentRepository) {
@@ -10,33 +10,39 @@ class PeriodService {
     this.studentRepository = studentRepository;
   }
 
-  // GET /periods → getPeriodList() returns string[]
+  isPeriod(period) {
+    if (!(period instanceof Period)) {
+      throw new Error("Periodo Escolar no registrado");
+    }
+    return true;
+  }
+
   getPeriodList() {
     return this.periodRepository.findAll().map((p) => p.id);
   }
 
   getPeriodStats(id) {
     const period = this.periodRepository.findById(id);
-    if (!period) {
-      throw new Error("Periodo Escolar no registrado");
-    }
+    this.isPeriod(period);
 
     const gradeCount = this.periodRepository.getGradeCount(id);
-    const loaded = gradeCount.find((g) => g.loaded === 1)?.count || 0;
-    const notLoaded = gradeCount.find((g) => g.loaded === 0)?.count || 0;
+    const loadedGrades = gradeCount.find((g) => g.loaded === 1)?.count || 0;
+    const notLoadedGrades = gradeCount.find((g) => g.loaded === 0)?.count || 0;
 
     const studentCount = this.periodRepository.getStudentCount(id);
-    const total = studentCount.reduce((t, c) => t + c.count, 0);
-    const approved =
+    const totalStudents = studentCount.reduce((t, c) => t + c.count, 0);
+    const approvedStudents =
       studentCount.find((c) => c.status === "approved")?.count || 0;
 
     period.stats =
       period.status === "new"
         ? null
-        : {
-            grades: { total: loaded + notLoaded, loaded },
-            students: { total, approved },
-          };
+        : new PeriodStats(
+            loadedGrades + notLoadedGrades,
+            loadedGrades,
+            totalStudents,
+            approvedStudents
+          );
 
     return period;
   }
@@ -45,14 +51,14 @@ class PeriodService {
   // Returns { [yearId]: className[] }
   getClassesByYear(periodId) {
     const period = this.periodRepository.findById(periodId);
-    if (!period) throw new Error("Periodo Escolar no registrado");
+    this.isPeriod(period);
 
     const years = this.yearRepository.findAll();
-    const yearPeriods = this.periodRepository.findAllAssignedYears(periodId);
+    const yearPeriod = this.periodRepository.findAllAssignedYears(periodId);
 
     const result = Object.fromEntries(years.map((y) => [y.id, []]));
 
-    for (const yp of yearPeriods) {
+    for (const yp of yearPeriod) {
       const classes = this.yearRepository.findAllAssignedClasses(yp.id);
       if (!result[yp.yearId]) result[yp.yearId] = [];
       for (const cls of classes) {
@@ -68,24 +74,27 @@ class PeriodService {
 
   getStudentsByPeriod(periodId, filters = {}) {
     const period = this.periodRepository.findById(periodId);
-    if (!period) throw new Error("Periodo Escolar no registrado");
+    this.isPeriod(period);
 
-    const normalize = (v) => String(v ?? "").toLowerCase().trim();
+    const normalize = (v) =>
+      String(v ?? "")
+        .toLowerCase()
+        .trim();
 
     const f = {
-      id:          normalize(filters.id),
-      firstName:   normalize(filters.firstName),
-      lastName:    normalize(filters.lastName),
+      id: normalize(filters.id),
+      firstName: normalize(filters.firstName),
+      lastName: normalize(filters.lastName),
       dateOfBirth: normalize(filters.dateOfBirth),
-      birthPlace:  normalize(filters.birthPlace),
-      year:        normalize(filters.year),
-      className:     normalize(filters.className),
+      birthPlace: normalize(filters.birthPlace),
+      year: normalize(filters.year),
+      className: normalize(filters.className),
     };
 
-    const yearPeriods = this.periodRepository.findAllAssignedYears(periodId);
+    const yearPeriod = this.periodRepository.findAllAssignedYears(periodId);
     const rows = [];
 
-    for (const yp of yearPeriods) {
+    for (const yp of yearPeriod) {
       if (f.year && String(yp.yearId) !== f.year) continue;
 
       const classes = this.yearRepository.findAllAssignedClasses(yp.id);
@@ -96,48 +105,141 @@ class PeriodService {
         const classStudents = this.studentRepository.findAllByClass(cls.id);
 
         for (const student of classStudents) {
-          if (f.id          && !String(student.id).includes(f.id))                          continue;
-          if (f.firstName   && !normalize(student.firstName).includes(f.firstName))          continue;
-          if (f.lastName    && !normalize(student.lastName).includes(f.lastName))            continue;
-          if (f.dateOfBirth && !normalize(student.birthDate).includes(f.dateOfBirth))        continue;
-          if (f.birthPlace  && !normalize(student.birthPlace).includes(f.birthPlace))        continue;
+          if (f.id && !String(student.id).includes(f.id)) continue;
+          if (
+            f.firstName &&
+            !normalize(student.firstName).includes(f.firstName)
+          )
+            continue;
+          if (f.lastName && !normalize(student.lastName).includes(f.lastName))
+            continue;
+          if (
+            f.dateOfBirth &&
+            !normalize(student.birthDate).includes(f.dateOfBirth)
+          )
+            continue;
+          if (
+            f.birthPlace &&
+            !normalize(student.birthPlace).includes(f.birthPlace)
+          )
+            continue;
 
           rows.push({
-            id:         student.id,
-            firstName:  student.firstName,
-            lastName:   student.lastName,
-            birthDate:  student.birthDate,
+            id: student.id,
+            firstName: student.firstName,
+            lastName: student.lastName,
+            birthDate: student.birthDate,
             birthPlace: student.birthPlace,
-            status:     student.status,
+            status: student.status,
             _class: { id: cls.name, year: yp.yearId },
           });
         }
       }
     }
 
-    return {rows, years: this.yearRepository.findAll(), classesByYear: this.getClassesByYear(periodId), studentFieldLabels: {
-      id: "Cédula",
-      firstName: "Nombres",
-      lastName: "Apellidos",
-      birthDate: "Fecha de Nacimiento",
-      birthPlace: "Lugar de Nacimiento",
-    }};
+    return {
+      rows,
+      years: this.yearRepository.findAll(),
+      classesByYear: this.getClassesByYear(periodId),
+      studentFieldLabels: {
+        id: "Cédula",
+        firstName: "Nombres",
+        lastName: "Apellidos",
+        birthDate: "Fecha de Nacimiento",
+        birthPlace: "Lugar de Nacimiento",
+      },
+    };
   }
 
   getStudentById(periodId, studentId) {
     const period = this.periodRepository.findById(periodId);
-    if (!period) throw new Error("Periodo Escolar no registrado");
+    this.isPeriod(period);
 
     const student = this.studentRepository.findById(studentId);
     if (!student) throw new Error("Estudiante no registrado");
 
-    return {student, studentFieldLabels: {
-      id: "Cédula",
-      firstName: "Nombres",
-      lastName: "Apellidos",
-      birthDate: "Fecha de Nacimiento",
-      birthPlace: "Lugar de Nacimiento",
-    }};
+    return {
+      student,
+      studentFieldLabels: {
+        id: "Cédula",
+        firstName: "Nombres",
+        lastName: "Apellidos",
+        birthDate: "Fecha de Nacimiento",
+        birthPlace: "Lugar de Nacimiento",
+      },
+    };
+  }
+
+  isPeriodListAddable(periodList) {
+    if (!Array.isArray(periodList)) {
+      return false;
+    }
+
+    return !periodList.some(
+      (period) => period.status === "new" || period.status === "active"
+    );
+  }
+
+  isValidNewPeriod(period) {
+    const isSqliteDate = (date) => {
+      if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return false;
+      }
+
+      const [year, month, day] = date.split("-").map(Number);
+      const parsedDate = new Date(Date.UTC(year, month - 1, day));
+
+      return (
+        parsedDate.getUTCFullYear() === year &&
+        parsedDate.getUTCMonth() === month - 1 &&
+        parsedDate.getUTCDate() === day
+      );
+    };
+
+    if (!period || typeof period !== "object") {
+      return false;
+    }
+
+    if (
+      !Number.isInteger(period.startYear) ||
+      !Number.isInteger(period.endYear)
+    ) {
+      return false;
+    }
+
+    if (period.endYear !== period.startYear + 1) {
+      return false;
+    }
+
+    if (!isSqliteDate(period.openingDate)) {
+      return false;
+    }
+
+    const openingYear = Number(period.openingDate.slice(0, 4));
+    return openingYear === period.startYear;
+  }
+
+  addPeriod(period) {
+    const periodList = this.periodRepository.findAll();
+
+    if (!this.isPeriodListAddable(periodList)) {
+      throw new Error("No se puede agregar un nuevo periodo sin haber archivado los todos los demás");
+    }
+
+    if (!this.isValidNewPeriod(period)) {
+      throw new Error("Periodo no válido");
+    }
+    
+    const newPeriod = new Period(
+      period.startYear,
+      "new",
+      period.startYear,
+      period.endYear,
+      period.openingDate,
+      null
+    );
+    this.periodRepository.create(newPeriod);
+    return newPeriod
   }
 
   // POST /periods/:id/load → loadPeriodData(periodId, students, subjectsPerYear)
@@ -146,7 +248,7 @@ class PeriodService {
   // Only populates if the period has no students yet (mirrors frontend guard)
   loadPeriodData(periodId, students, subjectsPerYear) {
     const period = this.periodRepository.findById(periodId);
-    if (!period) throw new Error("Periodo Escolar no registrado");
+    this.isPeriod(period);
 
     if (period.status !== "new") {
       return { loaded: false, reason: "already_loaded" };
@@ -158,15 +260,15 @@ class PeriodService {
         ? subjectsPerYear
         : {};
 
-    const yearPeriodMap = new Map()
-    const classMap = new Map()
+    const yearPeriodMap = new Map();
+    const classMap = new Map();
 
     for (const year of this.yearRepository.findAll()) {
       if (!subjectsByYear[year.id]) {
         continue;
       }
 
-      const yearPeriod = this.periodRepository.assignYear(year.id, period.id)
+      const yearPeriod = this.periodRepository.assignYear(year.id, period.id);
 
       for (const subjectId of subjectsByYear[year.id]) {
         this.yearRepository.assignSubject(subjectId, yearPeriod.id);
@@ -197,11 +299,17 @@ class PeriodService {
 
       let existingClass = classMap.get(`${yp.id}-${className}`);
       if (!existingClass) {
-        existingClass = this.yearRepository.assignClass(new Class(null, className, null, null, null, yp.id));
-        classMap.set(`${yp.id}-${className}`, existingClass)
+        existingClass = this.yearRepository.assignClass(
+          new Class(null, className, null, null, null, yp.id)
+        );
+        classMap.set(`${yp.id}-${className}`, existingClass);
       }
 
-      this.studentRepository.assignToClass(student.id, existingClass.id, "Reprobado")
+      this.studentRepository.assignToClass(
+        student.id,
+        existingClass.id,
+        "Reprobado"
+      );
     }
 
     this.periodRepository.update(periodId, { ...period, status: "loaded" });
@@ -220,9 +328,9 @@ class PeriodService {
     let sourcePeriod = null;
 
     for (const period of periods) {
-      const yearPeriods = this.periodRepository.findAllAssignedYears(period.id);
+      const yearPeriod = this.periodRepository.findAllAssignedYears(period.id);
       let hasStudents = false;
-      for (const yp of yearPeriods) {
+      for (const yp of yearPeriod) {
         const classes = this.yearRepository.findAllAssignedClasses(yp.id);
         for (const cls of classes) {
           const s = this.studentRepository.findAllByClass(cls.id);
@@ -242,10 +350,10 @@ class PeriodService {
     const students = [];
 
     if (sourcePeriod) {
-      const yearPeriods = this.periodRepository.findAllAssignedYears(
+      const yearPeriod = this.periodRepository.findAllAssignedYears(
         sourcePeriod.id
       );
-      for (const yp of yearPeriods) {
+      for (const yp of yearPeriod) {
         const currentYearId = Number(yp.yearId);
 
         // Students in the final year have graduated — exclude them

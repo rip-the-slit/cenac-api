@@ -44,7 +44,15 @@ export class Guardian {
 }
 
 export class Student {
-  constructor(id, firstName, lastName, birthDate, birthPlace, status, classId = null) {
+  constructor(
+    id,
+    firstName,
+    lastName,
+    birthDate,
+    birthPlace,
+    status,
+    classId = null
+  ) {
     this.id = id;
     this.firstName = firstName;
     this.lastName = lastName;
@@ -63,6 +71,13 @@ export class Period {
     this.endYear = endYear;
     this.openingDate = openingDate;
     this.closingDate = closingDate;
+  }
+}
+
+export class PeriodStats {
+  constructor(totalGrades, loadedGrades, totalStudents, approvedStudents) {
+    this.grades = { total: totalGrades, loaded: loadedGrades };
+    this.students = { total: totalStudents, approved: approvedStudents };
   }
 }
 
