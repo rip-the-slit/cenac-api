@@ -1,8 +1,10 @@
 import PeriodService from "../services/PeriodService.js";
+import StudentService from "../services/StudentService.js";
 
 class PeriodController {
-  constructor(periodService) {
+  constructor(periodService, studentService) {
     this.periodService = periodService;
+    this.studentService = studentService;
   }
 
   getPeriodStats(req, res) {
@@ -34,7 +36,7 @@ class PeriodController {
 
   getClassesByYear(req, res) {
     try {
-      const data = this.periodService.getClassesByYear(req.params.id);
+      const data = this.studentService.getClassesByYear(req.params.id);
       res.json(data);
     } catch (e) {
       res.status(404).json({ error: e.message });
@@ -46,7 +48,7 @@ class PeriodController {
       const { id, firstName, lastName, dateOfBirth, birthPlace, year } = req.query;
       // express uses the param name as-is; frontend sends "class"
       const classId = req.query.class;
-      const data = this.periodService.getStudentsByPeriod(req.params.id, {
+      const data = this.studentService.getStudentsByPeriod(req.params.id, {
         id,
         firstName,
         lastName,
@@ -63,7 +65,7 @@ class PeriodController {
 
   getStudentById(req, res) {
     try {
-      const data = this.periodService.getStudentById(req.params.id, req.params.studentId);
+      const data = this.studentService.getStudentById(req.params.id, req.params.studentId);
       res.json(data);
     } catch (e) {
       res.status(404).json({ error: e.message });
@@ -98,7 +100,7 @@ class PeriodController {
 
   getClassSuggestions(req, res) {
     try {
-      const data = this.periodService.getClassSuggestions();
+      const data = this.studentService.getClassSuggestions();
       res.json(data);
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -106,4 +108,4 @@ class PeriodController {
   }
 }
 
-export default new PeriodController(PeriodService);
+export default new PeriodController(PeriodService, StudentService);
