@@ -3,6 +3,8 @@ import PeriodRepository from "../repositories/PeriodRepository.js";
 import YearRepository from "../repositories/YearRepository.js";
 import StudentRepository from "../repositories/StudentRepository.js";
 import { Grade } from "../models/index.js";
+import { normalizeQueryValue, sanitizePagination } from "./queryUtils.js";
+import PeriodService from "./PeriodService.js";
 
 function toNumberOrNull(value) {
   if (value === null || value === undefined || value === "") return null;
@@ -16,12 +18,14 @@ class GradeService {
     subjectRepository,
     periodRepository,
     yearRepository,
-    studentRepository
+    studentRepository,
+    periodService
   ) {
     this.subjectRepository = subjectRepository;
     this.periodRepository = periodRepository;
     this.yearRepository = yearRepository;
     this.studentRepository = studentRepository;
+    this.periodService = periodService;
   }
 
   _getStudentClassStatus(studentId, periodId) {
@@ -61,27 +65,15 @@ class GradeService {
     return subjectsPerYear;
   }
 
-  // Builds [{ studentId, yearId, classId, firstName, lastName }] for a period
   _getStudentsWithMeta(periodId) {
-    const yearPeriods = this.periodRepository.findAllAssignedYears(periodId);
-    const rows = [];
-    for (const yp of yearPeriods) {
-      const classes = this.yearRepository.findAllAssignedClasses(yp.id);
-      for (const cls of classes) {
-        const students = this.studentRepository.findAllByClass(cls.id);
-        for (const s of students) {
-          rows.push({
-            id: s.id,
-            firstName: s.firstName,
-            lastName: s.lastName,
-            status: s.status,
-            classId: cls.name,
-            yearId: yp.yearId,
-          });
-        }
-      }
-    }
-    return rows;
+    return this.studentRepository.findAllByPeriod(periodId).rows.map((student) => ({
+      id: student.id,
+      firstName: student.firstName,
+      lastName: student.lastName,
+      status: student.status,
+      classId: student.className,
+      yearId: student.yearId,
+    }));
   }
 
   // Builds a map: `${yearId}-${subjectId}` → yearSubjectId
@@ -97,127 +89,88 @@ class GradeService {
     return map;
   }
 
-  // GET /grades?periodId&yearId&classId&subjectId&q
-  // Mirrors getGrades() in db.js
-  getGrades(periodId, { yearId, classId, status, q } = {}) {
+  _parseGradeRows(studentRows, gradeRows) {
+    const students = new Map(
+      studentRows.map((student) => [
+        student.id,
+        {
+          id: student.id,
+          fullName: `${student.lastName} ${student.firstName}`,
+          status: student.status,
+          class: `${student.yearName || student.yearId} ${student.className}`,
+          grades: {},
+        },
+      ])
+    );
+
+    for (const rawGrade of gradeRows) {
+      const student = students.get(rawGrade.studentId);
+      if (!student) continue;
+
+      const subjectId = String(rawGrade.subjectId);
+      if (!student.grades[subjectId]) {
+        student.grades[subjectId] = {
+          avg: toNumberOrNull(rawGrade.subjectAverage),
+          terms: Array.from({ length: 3 }, () => Array(4).fill(null)),
+          termAverages: Array(3).fill(null),
+        };
+      }
+
+      const subjectGrades = student.grades[subjectId];
+      const termIndex = Number(rawGrade.term) - 1;
+      const strategyIndex = Number(rawGrade.strategy) - 1;
+      if (
+        subjectGrades.terms[termIndex] &&
+        strategyIndex >= 0 &&
+        strategyIndex < subjectGrades.terms[termIndex].length
+      ) {
+        subjectGrades.terms[termIndex][strategyIndex] =
+          toNumberOrNull(rawGrade.value);
+        subjectGrades.termAverages[termIndex] =
+          toNumberOrNull(rawGrade.termAverage);
+      }
+    }
+
+    return Array.from(students.values()).map((student) => ({
+      ...student,
+      subjectAverages: Object.fromEntries(
+        Object.entries(student.grades).map(([subjectId, details]) => [
+          subjectId,
+          details.avg,
+        ])
+      ),
+      subjectDetails: student.grades,
+    }));
+  }
+
+  // GET /grades?periodId&yearId&classId&status&q&page&limit
+  getGrades(periodId, filters = {}) {
     const period = this.periodRepository.findById(periodId);
     if (!period) throw new Error("Periodo Escolar no registrado");
 
-    const subjectsPerYear = this._getSubjectsPerYear(periodId);
-    const studentsMeta = this._getStudentsWithMeta(periodId);
-    const yearSubjectMap = this._getYearSubjectMap(periodId);
-
-    const allYears = this.yearRepository.findAll();
-    const yearsById = new Map(allYears.map((y) => [y.id, y]));
-
-    const allSubjects = this.subjectRepository.findAll();
-    const subjectsById = Object.fromEntries(
-      allSubjects.map((s) => [String(s.id), s])
-    );
-
-    const normalize = (v) =>
-      String(v ?? "")
-        .toLowerCase()
-        .trim();
-    const query = normalize(q);
-    const rows = [];
-
-    for (const student of studentsMeta) {
-      // Apply yearId / classId filters early
-      if (yearId && String(student.yearId) !== String(yearId)) continue;
-      if (classId && String(student.classId) !== String(classId)) continue;
-      if (status && student.status !== status) continue;
-
-      // Apply text search filter
-      if (
-        query &&
-        !(
-          normalize(`${student.firstName} ${student.lastName}`).includes(
-            query
-          ) || String(student.id).includes(query)
-        )
-      ) {
-        continue;
-      }
-
-      const allowedSubjects = new Set(
-        subjectsPerYear[String(student.yearId)] || []
-      );
-
-      // Build bySubject: { subjectId: { avg, terms, lapsoAverages } }
-      const bySubject = {};
-
-      for (const sKey of allowedSubjects) {
-        const yearSubjectId = yearSubjectMap.get(`${student.yearId}-${sKey}`);
-        if (!yearSubjectId) continue;
-
-        const gradeRows = this.subjectRepository.findAllGradesByStudent(
-          yearSubjectId,
-          student.id
-        );
-
-        if (!gradeRows.length) continue;
-
-        const terms = Array.from({ length: 3 }, () => Array(4).fill(null));
-        for (const row of gradeRows) {
-          const term = Number(row.term) - 1;
-          const strategy = Number(row.strategy) - 1;
-          const value = toNumberOrNull(row.value);
-          if (!terms[term] || strategy < 0 || strategy >= terms[term].length) {
-            continue;
-          }
-          terms[term][strategy] = value;
-        }
-
-        const termAverages = terms.map((grades) => {
-          const safe = grades.filter(Number.isFinite);
-          return safe.length
-            ? safe.reduce((a, b) => a + b, 0) / safe.length
-            : null;
-        });
-
-        const avg = this.subjectRepository.getGradeAvgByStudent(
-          yearSubjectId,
-          student.id
-        );
-
-        bySubject[sKey] = { avg, terms, termAverages };
-      }
-
-      const year = yearsById.get(student.yearId);
-      rows.push({
-        id: student.id,
-        fullName: `${student.firstName} ${student.lastName}`,
-        status: student.status,
-        class: `${year?.name || student.yearId} ${student.classId}`,
-        grades: bySubject,
-        subjectAverages: Object.fromEntries(
-          Object.entries(bySubject).map(([k, v]) => [k, v.avg])
-        ),
-        subjectDetails: bySubject,
+    const sanitizedFilters = {
+      yearId: normalizeQueryValue(filters.yearId),
+      className: normalizeQueryValue(filters.classId),
+      status: normalizeQueryValue(filters.status),
+      q: normalizeQueryValue(filters.q),
+    };
+    const pagination = sanitizePagination(filters);
+    const { rows: studentRows, recordsAmount } =
+      this.studentRepository.findAllByPeriod(periodId, {
+        filters: sanitizedFilters,
+        pagination,
       });
-    }
-
-    // Subjects present in any year of this period
-    const periodSubjectIds = new Set(
-      Object.values(subjectsPerYear).flat().map(String)
+    const gradeRows = this.subjectRepository.findAllGradesByStudents(
+      periodId,
+      studentRows.map((student) => student.id)
     );
-    const filteredSubjects = allSubjects.filter((s) =>
-      periodSubjectIds.has(String(s.id))
-    );
-
-    // classesByYear
-    const classesByYear = Object.fromEntries(allYears.map((y) => [y.id, []]));
-    for (const s of studentsMeta) {
-      if (!classesByYear[s.yearId]) classesByYear[s.yearId] = [];
-      if (!classesByYear[s.yearId].includes(s.classId)) {
-        classesByYear[s.yearId].push(s.classId);
-      }
-    }
-    Object.values(classesByYear).forEach((list) => list.sort());
+    const filterData = this.periodService.getPeriodFilterData(periodId, {
+      includeSubjects: true,
+    });
 
     return {
-      rows,
+      rows: this._parseGradeRows(studentRows, gradeRows),
+      recordsAmount,
       studentGradesFieldLabels: {
         id: "Cédula",
         fullName: "Nombre Completo",
@@ -225,10 +178,7 @@ class GradeService {
         class: "Sección",
         grades: "Notas",
       },
-      subjects: filteredSubjects,
-      years: allYears,
-      classesByYear,
-      subjectsById,
+      ...filterData,
       statuses: ["Aprobado", "Reprobado"],
     };
   }
@@ -314,5 +264,6 @@ export default new GradeService(
   SubjectRepository,
   PeriodRepository,
   YearRepository,
-  StudentRepository
+  StudentRepository,
+  PeriodService
 );

@@ -35,6 +35,75 @@ class SubjectRepository {
     );
   }
 
+  findAllByPeriod(periodId) {
+    const query = this.db.prepare(`
+      SELECT DISTINCT subject.id, subject.name, subject.abbr,
+        subject.minimum_grade as "minimumGrade"
+      FROM subject
+      JOIN year_subject ON year_subject.subject_id = subject.id
+      JOIN year_period ON year_period.id = year_subject.year_period_id
+      WHERE year_period.period_id = ?
+      ORDER BY subject.name COLLATE NOCASE ASC
+    `);
+
+    return query.all(periodId).map(
+      (row) => new Subject(row.id, row.name, row.abbr, row.minimumGrade)
+    );
+  }
+
+
+  findAllGradesByStudents(periodId, studentIds) {
+    if (!Array.isArray(studentIds) || studentIds.length === 0) {
+      return [];
+    }
+
+    const placeholders = studentIds.map(() => "?").join(", ");
+    const query = this.db.prepare(`
+      WITH selected_grades AS (
+        SELECT grade.id as "gradeId",
+          grade.student_id as "studentId",
+          grade.term,
+          grade.strategy,
+          grade.value,
+          year_subject.id as "yearSubjectId",
+          year_subject.subject_id as "subjectId"
+        FROM grade
+        JOIN year_subject ON year_subject.id = grade.year_subject_id
+        JOIN year_period ON year_period.id = year_subject.year_period_id
+        WHERE year_period.period_id = ?
+          AND grade.student_id IN (${placeholders})
+      ),
+      subject_averages AS (
+        SELECT studentId, yearSubjectId, AVG(value) as "subjectAverage"
+        FROM selected_grades
+        WHERE value IS NOT NULL
+        GROUP BY studentId, yearSubjectId
+      ),
+      term_averages AS (
+        SELECT studentId, yearSubjectId, term, AVG(value) as "termAverage"
+        FROM selected_grades
+        WHERE value IS NOT NULL
+        GROUP BY studentId, yearSubjectId, term
+      )
+      SELECT selected_grades.*,
+        subject_averages.subjectAverage,
+        term_averages.termAverage
+      FROM selected_grades
+      LEFT JOIN subject_averages
+        ON subject_averages.studentId = selected_grades.studentId
+        AND subject_averages.yearSubjectId = selected_grades.yearSubjectId
+      LEFT JOIN term_averages
+        ON term_averages.studentId = selected_grades.studentId
+        AND term_averages.yearSubjectId = selected_grades.yearSubjectId
+        AND term_averages.term = selected_grades.term
+      ORDER BY selected_grades.studentId ASC,
+        selected_grades.subjectId ASC,
+        selected_grades.term ASC,
+        selected_grades.strategy ASC
+    `);
+
+    return query.all(periodId, ...studentIds);
+  }
   create(subject) {
     const query = this.db.prepare(`
       INSERT INTO subject (id, name, minimum_grade) 

@@ -1,13 +1,20 @@
 import PeriodRepository from "../repositories/PeriodRepository.js";
 import YearRepository from "../repositories/YearRepository.js";
 import StudentRepository from "../repositories/StudentRepository.js";
-import { Class, Period, PeriodStats, Student } from "../models/index.js";
+import SubjectRepository from "../repositories/SubjectRepository.js";
+import { Class, Period, PeriodStats, Student, Year } from "../models/index.js";
 
 class PeriodService {
-  constructor(periodRepository, yearRepository, studentRepository) {
+  constructor(
+    periodRepository,
+    yearRepository,
+    studentRepository,
+    subjectRepository
+  ) {
     this.periodRepository = periodRepository;
     this.yearRepository = yearRepository;
     this.studentRepository = studentRepository;
+    this.subjectRepository = subjectRepository;
   }
 
   isPeriod(period) {
@@ -19,6 +26,48 @@ class PeriodService {
 
   getPeriodList() {
     return this.periodRepository.findAll().map((p) => p.id);
+  }
+
+  getPeriodFilterData(periodId, { includeSubjects = false } = {}) {
+    const years = this.periodRepository
+      .findAllAssignedYears(periodId)
+      .map((y) => ({
+        ...new Year(y.yearId, y.yearName),
+        yearPeriodId: y.id,
+      }));
+    const classes =
+      this.yearRepository.findAllAssignedClassesByPeriod(periodId);
+    const classesByYear = Object.fromEntries(
+      years.map((year) => [year.yearId, []])
+    );
+
+    for (const assignedClass of classes) {
+      if (!classesByYear[assignedClass.yearId]) {
+        classesByYear[assignedClass.yearId] = [];
+      }
+
+      const classNames = classesByYear[assignedClass.yearId];
+      if (!classNames.includes(assignedClass.name)) {
+        classNames.push(assignedClass.name);
+      }
+    }
+
+    const filterData = { years, classesByYear };
+    if (!includeSubjects) return filterData;
+
+    const subjects = this.subjectRepository.findAllByPeriod(periodId);
+    const subjectsByYear = Object.fromEntries(
+      years.map((year) => [
+        year.id,
+        this.yearRepository.findAllAssignedSubjects(year.yearPeriodId).map(s => s.id),
+      ])
+    );
+
+    return {
+      ...filterData,
+      subjects,
+      subjectsByYear,
+    };
   }
 
   getPeriodStats(id) {
@@ -100,13 +149,15 @@ class PeriodService {
     const periodList = this.periodRepository.findAll();
 
     if (!this.isPeriodListAddable(periodList)) {
-      throw new Error("No se puede agregar un nuevo periodo sin haber archivado los todos los demás");
+      throw new Error(
+        "No se puede agregar un nuevo periodo sin haber archivado los demás"
+      );
     }
 
     if (!this.isValidNewPeriod(period)) {
       throw new Error("Periodo no válido");
     }
-    
+
     const newPeriod = new Period(
       period.startYear,
       "new",
@@ -116,7 +167,7 @@ class PeriodService {
       null
     );
     this.periodRepository.create(newPeriod);
-    return newPeriod
+    return newPeriod;
   }
 
   // POST /periods/:id/load → loadPeriodData(periodId, students, subjectsPerYear)
@@ -193,11 +244,11 @@ class PeriodService {
 
     return { loaded: true };
   }
-
 }
 
 export default new PeriodService(
   PeriodRepository,
   YearRepository,
-  StudentRepository
+  StudentRepository,
+  SubjectRepository
 );

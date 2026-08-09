@@ -66,6 +66,97 @@ class StudentRepository {
     );
   }
 
+  _getPeriodStudentWhere(periodId, filters) {
+    const conditions = ["year_period.period_id = ?"];
+    const params = [periodId];
+
+    const addContainsFilter = (column, value) => {
+      if (!value) return;
+      conditions.push(`LOWER(${column}) LIKE ?`);
+      params.push(`%${value}%`);
+    };
+
+    addContainsFilter("student.id", filters.id);
+    addContainsFilter("student.first_name", filters.firstName);
+    addContainsFilter("student.last_name", filters.lastName);
+    addContainsFilter("student.birth_date", filters.dateOfBirth);
+    addContainsFilter("student.birth_place", filters.birthPlace);
+
+    if (filters.yearId) {
+      conditions.push("CAST(year_period.year_id AS TEXT) = ?");
+      params.push(filters.yearId);
+    }
+
+    if (filters.className) {
+      conditions.push("LOWER(class.name) = ?");
+      params.push(filters.className);
+    }
+
+    if (filters.status) {
+      conditions.push("LOWER(student_class.status) = ?");
+      params.push(filters.status);
+    }
+
+    if (filters.q) {
+      conditions.push(`(
+        LOWER(student.first_name || ' ' || student.last_name) LIKE ?
+        OR LOWER(student.id) LIKE ?
+      )`);
+      params.push(`%${filters.q}%`, `%${filters.q}%`);
+    }
+
+    return { where: conditions.join(" AND "), params };
+  }
+
+  findAllByPeriod(periodId, { filters = {}, pagination = null } = {}) {
+    const { where, params } = this._getPeriodStudentWhere(periodId, filters);
+    const joins = `
+      FROM student
+      JOIN student_class ON student_class.student_id = student.id
+      JOIN class ON class.id = student_class.class_id
+      JOIN year_period ON year_period.id = class.year_period_id
+      JOIN year ON year.id = year_period.year_id
+      WHERE ${where}
+    `;
+
+    const countRow = this.db.prepare(`
+      SELECT COUNT(*) as "recordsAmount"
+      ${joins}
+    `).get(...params);
+
+    const paginationSql = pagination ? "LIMIT ? OFFSET ?" : "";
+    const rowParams = pagination
+      ? [...params, pagination.limit, pagination.offset]
+      : params;
+    const studentColumns = `
+      student.id,
+      student.first_name as "firstName",
+      student.last_name as "lastName",
+      student.birth_date as "birthDate",
+      student.birth_place as "birthPlace",
+      student_class.status,
+      class.id as "classDatabaseId",
+      class.name as "className",
+      year_period.id as "yearPeriodId",
+      year_period.year_id as "yearId",
+      year.name as "yearName"
+    `;
+    const order = `
+      ORDER BY student.last_name COLLATE NOCASE ASC,
+        student.first_name COLLATE NOCASE ASC,
+        student.id ASC
+    `;
+
+    const rows = this.db.prepare(`
+      SELECT ${studentColumns}
+      ${joins}
+      ${order}
+      ${paginationSql}
+    `).all(...rowParams);
+
+    return { rows, recordsAmount: Number(countRow.recordsAmount) };
+  }
+
   create(student) {
     const query = this.db.prepare(`
         INSERT INTO student (id, first_name, last_name, birth_date, birth_place, status)

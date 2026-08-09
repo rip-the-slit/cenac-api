@@ -67,6 +67,29 @@ class YearRepository {
     );
   }
 
+  findAllAssignedClassesByPeriod(periodId) {
+    const query = this.db.prepare(`
+      SELECT class.*, class.year_period_id as "yearPeriodId", year_period.year_id as "yearId"
+      FROM class
+      JOIN year_period ON year_period.id = class.year_period_id
+      WHERE year_period.period_id = ?
+      ORDER BY year_period.year_id ASC, class.name COLLATE NOCASE ASC
+    `);
+
+    return query.all(periodId).map((row) => {
+      const assignedClass = new Class(
+        row.id,
+        row.name,
+        row.shift,
+        row.location,
+        row.capacity,
+        row.yearPeriodId
+      );
+      assignedClass.yearId = row.yearId;
+      return assignedClass;
+    });
+  }
+
   findClassByName(className, yearPeriodId) {
     const query = this.db.prepare(
       `SELECT *, year_period_id as "yearPeriodId" FROM class WHERE name = ? AND year_period_id = CAST(? AS INTEGER)`

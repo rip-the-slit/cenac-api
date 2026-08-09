@@ -7,15 +7,6 @@ class PeriodController {
     this.studentService = studentService;
   }
 
-  getPeriodStats(req, res) {
-    try {
-      const data = this.periodService.getPeriodById(req.params.id);
-      res.json(data);
-    } catch (e) {
-      res.status(404).json({ error: e.message });
-    }
-  }
-
   getPeriodList(req, res) {
     try {
       const data = this.periodService.getPeriodList();
@@ -45,7 +36,16 @@ class PeriodController {
 
   getStudentsByPeriod(req, res) {
     try {
-      const { id, firstName, lastName, dateOfBirth, birthPlace, year } = req.query;
+      const {
+        id,
+        firstName,
+        lastName,
+        dateOfBirth,
+        birthPlace,
+        year,
+        page,
+        limit,
+      } = req.query;
       // express uses the param name as-is; frontend sends "class"
       const classId = req.query.class;
       const data = this.studentService.getStudentsByPeriod(req.params.id, {
@@ -56,6 +56,8 @@ class PeriodController {
         birthPlace,
         year,
         classId,
+        page,
+        limit,
       });
       res.json(data);
     } catch (e) {
