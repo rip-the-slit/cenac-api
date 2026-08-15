@@ -108,6 +108,19 @@ class PeriodController {
       res.status(500).json({ error: e.message });
     }
   }
+
+  archivePeriod(req, res) {
+    try {
+      const { supersede } = req.body;
+      if (typeof supersede !== "boolean") {
+        return res.status(400).json({ error: "supersede debe ser un booleano" });
+      }
+      const data = this.periodService.archivePeriod(req.params.id, supersede);
+      res.json(data);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  }
 }
 
 export default new PeriodController(PeriodService, StudentService);

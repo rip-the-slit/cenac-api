@@ -25,7 +25,7 @@ describe("PeriodService", () => {
 
       expect(PeriodService.isPeriodListAddable(periodList)).toBeFalsy();
 
-      periodList.at(-1).status = "active";
+      periodList.at(-1).status = "loaded";
 
       expect(PeriodService.isPeriodListAddable(periodList)).toBeFalsy();
     });

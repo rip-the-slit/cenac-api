@@ -25,7 +25,7 @@ class PeriodService {
   }
 
   getPeriodList() {
-    return this.periodRepository.findAll().map((p) => p.id);
+    return this.periodRepository.findAll();
   }
 
   getPeriodFilterData(periodId, { includeSubjects = false } = {}) {
@@ -102,7 +102,7 @@ class PeriodService {
     }
 
     return !periodList.some(
-      (period) => period.status === "new" || period.status === "active"
+      (period) => period.status === "new" || period.status === "loaded"
     );
   }
 
@@ -243,6 +243,36 @@ class PeriodService {
     this.periodRepository.update(periodId, { ...period, status: "loaded" });
 
     return { loaded: true };
+  }
+
+  archivePeriod(periodId, supersede) {
+    const period = this.periodRepository.findById(periodId);
+    this.isPeriod(period);
+
+    this.periodRepository.update(periodId, { ...period, status: "archived" });
+
+    if (!supersede) return;
+
+    const newPeriod = new Period(
+      period.endYear,
+      "new",
+      period.endYear,
+      period.endYear + 1,
+      period.openingDate,
+      null
+    );
+
+    const periodList = this.periodRepository.findAll();
+
+    if (!this.isPeriodListAddable(periodList)) {
+      throw new Error(
+        "No se puede agregar un nuevo periodo sin haber archivado los demás"
+      );
+    }
+    
+    this.periodRepository.create(newPeriod);
+
+    return this.periodRepository.findById(newPeriod.id);
   }
 }
 

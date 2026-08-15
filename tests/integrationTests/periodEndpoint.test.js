@@ -38,25 +38,28 @@ const periodStudents = [
 ];
 
 describe("Period Endpoint", () => {
-  test("Root returns empty array", async () => {
+  test("Root returns empty object", async () => {
     const res = await supertest(app).get(ROOT).expect(200);
 
-    expect(res.body).toBeInstanceOf(Array);
+    expect(res.body).toBeInstanceOf(Object);
     expect(res.body).toHaveLength(0);
   });
 
   test("Can start a new period", async () => {
-    await supertest(app)
-      .post(ROOT)
-      .send({
-        startYear: 2025,
-        endYear: 2026,
-        openingDate: "2025-10-10",
-      })
-      .expect(201);
+    const newPeriod = {
+      startYear: 2025,
+      endYear: 2026,
+      openingDate: "2025-10-10",
+    };
+    await supertest(app).post(ROOT).send(newPeriod).expect(201);
 
     const res = await supertest(app).get(ROOT).expect(200);
-    expect(res.body).toContain(PERIOD_ID);
+    expect(res.body[0]).toMatchObject({
+      status: "new",
+      startYear: 2025,
+      endYear: 2026,
+      openingDate: "2025-10-10",
+    });
   });
 
   test("Loads the period students", async () => {
@@ -101,7 +104,9 @@ describe("Period Endpoint", () => {
     expect(res.body.rows).toHaveLength(3);
     expect(res.body.recordsAmount).toBe(3);
     expect(res.body.rows.map(({ id }) => id)).toEqual([
-      students.ana, students.bruno, students.carla,
+      students.ana,
+      students.bruno,
+      students.carla,
     ]);
     expect(res.body.rows).toEqual(
       expect.arrayContaining([
@@ -124,15 +129,43 @@ describe("Period Endpoint", () => {
     ["year", { year: 2 }, [students.carla], 1],
     ["class", { class: "B" }, [students.bruno], 1],
     ["page", { page: 2, limit: 2 }, [students.carla], 3],
-  ])("Filters students by %s", async (_filter, query, expectedIds, recordsAmount) => {
-    const res = await supertest(app)
-      .get(`${ROOT}/${PERIOD_ID}/students`)
-      .query(query)
-      .expect(200);
+  ])(
+    "Filters students by %s",
+    async (_filter, query, expectedIds, recordsAmount) => {
+      const res = await supertest(app)
+        .get(`${ROOT}/${PERIOD_ID}/students`)
+        .query(query)
+        .expect(200);
 
-    expect(res.body.rows.map(({ id }) => id).sort()).toEqual(
-      [...expectedIds].sort()
-    );
-    expect(res.body.recordsAmount).toBe(recordsAmount);
+      expect(res.body.rows.map(({ id }) => id).sort()).toEqual(
+        [...expectedIds].sort()
+      );
+      expect(res.body.recordsAmount).toBe(recordsAmount);
+    }
+  );
+  test("Archives period and starts new one", async () => {
+    const newPeriod = {
+      status: "new",
+      startYear: 2026,
+      endYear: 2027,
+      openingDate: "2025-10-10",
+    };
+    expect(
+      (
+        await supertest(app)
+          .post(`${ROOT}/${PERIOD_ID}/archive`)
+          .send({ supersede: true })
+          .expect(200)
+      ).body
+    ).toMatchObject(newPeriod);
+
+    const res = await supertest(app).get(ROOT).expect(200);
+    expect(res.body[0]).toMatchObject(newPeriod)
+    expect(res.body[1]).toMatchObject({
+      status: "archived",
+      startYear: 2025,
+      endYear: 2026,
+      openingDate: "2025-10-10",
+    });
   });
 });
