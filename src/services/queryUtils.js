@@ -28,3 +28,10 @@ export function sanitizePagination({ page, limit } = {}) {
     offset: (parsedPage - 1) * parsedLimit,
   };
 }
+
+ export function toNumberOrNull(value) {
+  if (value === null || value === undefined || value === "") return null;
+
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}

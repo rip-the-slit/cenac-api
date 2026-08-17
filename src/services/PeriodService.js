@@ -29,39 +29,74 @@ class PeriodService {
   }
 
   getPeriodFilterData(periodId, { includeSubjects = false } = {}) {
-    const years = this.periodRepository
-      .findAllAssignedYears(periodId)
-      .map((y) => ({
-        ...new Year(y.yearId, y.yearName),
-        yearPeriodId: y.id,
-      }));
+    const isAllPeriods = periodId === "all";
+    const years = isAllPeriods
+      ? this.yearRepository.findAll()
+      : this.periodRepository
+          .findAllAssignedYears(periodId)
+          .map((y) => ({
+            ...new Year(y.yearId, y.yearName),
+            yearPeriodId: y.id,
+          }));
     const classes =
       this.yearRepository.findAllAssignedClassesByPeriod(periodId);
     const classesByYear = Object.fromEntries(
-      years.map((year) => [year.yearId, []])
+      years.map((year) => [year.id, []])
     );
 
-    for (const assignedClass of classes) {
-      if (!classesByYear[assignedClass.yearId]) {
-        classesByYear[assignedClass.yearId] = [];
+    if (isAllPeriods) {
+      const classesByYearPeriod = new Map();
+      for (const assignedClass of classes) {
+        const key = `${assignedClass.yearId}-${assignedClass.periodId}`;
+        if (!classesByYearPeriod.has(key)) {
+          classesByYearPeriod.set(key, {
+            yearId: assignedClass.yearId,
+            names: [],
+          });
+        }
+
+        const classNames = classesByYearPeriod.get(key).names;
+        if (!classNames.includes(assignedClass.name)) {
+          classNames.push(assignedClass.name);
+        }
       }
 
-      const classNames = classesByYear[assignedClass.yearId];
-      if (!classNames.includes(assignedClass.name)) {
-        classNames.push(assignedClass.name);
+      for (const { yearId, names } of classesByYearPeriod.values()) {
+        if (names.length > (classesByYear[yearId]?.length ?? 0)) {
+          classesByYear[yearId] = names;
+        }
+      }
+    } else {
+      for (const assignedClass of classes) {
+        if (!classesByYear[assignedClass.yearId]) {
+          classesByYear[assignedClass.yearId] = [];
+        }
+
+        const classNames = classesByYear[assignedClass.yearId];
+        if (!classNames.includes(assignedClass.name)) {
+          classNames.push(assignedClass.name);
+        }
       }
     }
 
     const filterData = { years, classesByYear };
     if (!includeSubjects) return filterData;
 
-    const subjects = this.subjectRepository.findAllByPeriod(periodId);
-    const subjectsByYear = Object.fromEntries(
-      years.map((year) => [
-        year.id,
-        this.yearRepository.findAllAssignedSubjects(year.yearPeriodId).map(s => s.id),
-      ])
-    );
+    const subjects = isAllPeriods
+      ? this.subjectRepository.findAll()
+      : this.subjectRepository.findAllByPeriod(periodId);
+    const subjectsByYear = isAllPeriods
+      ? Object.fromEntries(
+          years.map((year) => [year.id, subjects.map((subject) => subject.id)])
+        )
+      : Object.fromEntries(
+          years.map((year) => [
+            year.id,
+            this.yearRepository
+              .findAllAssignedSubjects(year.yearPeriodId)
+              .map((subject) => subject.id),
+          ])
+        );
 
     return {
       ...filterData,
@@ -71,7 +106,9 @@ class PeriodService {
   }
 
   getPeriodStats(id) {
-    const period = this.periodRepository.findById(id);
+    const period = id === "all"
+      ? new Period("all", null, null, null, null, null)
+      : this.periodRepository.findById(id);
     this.isPeriod(period);
 
     const gradeCount = this.periodRepository.getGradeCount(id);

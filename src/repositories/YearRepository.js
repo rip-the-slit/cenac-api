@@ -68,15 +68,21 @@ class YearRepository {
   }
 
   findAllAssignedClassesByPeriod(periodId) {
+    const periodFilter = periodId === "all"
+      ? ""
+      : "WHERE year_period.period_id = ?";
     const query = this.db.prepare(`
-      SELECT class.*, class.year_period_id as "yearPeriodId", year_period.year_id as "yearId"
+      SELECT class.*, class.year_period_id as "yearPeriodId",
+        year_period.year_id as "yearId", year_period.period_id as "periodId"
       FROM class
       JOIN year_period ON year_period.id = class.year_period_id
-      WHERE year_period.period_id = ?
-      ORDER BY year_period.year_id ASC, class.name COLLATE NOCASE ASC
+      ${periodFilter}
+      ORDER BY year_period.year_id ASC, year_period.period_id ASC,
+        class.name COLLATE NOCASE ASC
     `);
 
-    return query.all(periodId).map((row) => {
+    const rows = periodId === "all" ? query.all() : query.all(periodId);
+    return rows.map((row) => {
       const assignedClass = new Class(
         row.id,
         row.name,
@@ -86,6 +92,7 @@ class YearRepository {
         row.yearPeriodId
       );
       assignedClass.yearId = row.yearId;
+      assignedClass.periodId = row.periodId;
       return assignedClass;
     });
   }

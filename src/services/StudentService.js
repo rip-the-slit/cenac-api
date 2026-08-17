@@ -5,14 +5,6 @@ import { Period } from "../models/index.js";
 import { normalizeQueryValue, sanitizePagination } from "./queryUtils.js";
 import PeriodService from "./PeriodService.js";
 
-const studentFieldLabels = {
-  id: "Cédula",
-  firstName: "Nombres",
-  lastName: "Apellidos",
-  birthDate: "Fecha de Nacimiento",
-  birthPlace: "Lugar de Nacimiento",
-};
-
 class StudentService {
   constructor(
     periodRepository,
@@ -36,15 +28,19 @@ class StudentService {
   // GET /periods/:id/classes -> getClassesByYear(periodId)
   // Returns { [yearId]: className[] }
   getClassesByYear(periodId) {
-    const period = this.periodRepository.findById(periodId);
-    this.isPeriod(period);
+    if (periodId !== "all") {
+      const period = this.periodRepository.findById(periodId);
+      this.isPeriod(period);
+    }
 
     return this.periodService.getPeriodFilterData(periodId).classesByYear;
   }
 
   getStudentsByPeriod(periodId, filters = {}) {
-    const period = this.periodRepository.findById(periodId);
-    this.isPeriod(period);
+    if (periodId !== "all") {
+      const period = this.periodRepository.findById(periodId);
+      this.isPeriod(period);
+    }
 
     const sanitizedFilters = {
       id: normalizeQueryValue(filters.id),
@@ -54,12 +50,14 @@ class StudentService {
       birthPlace: normalizeQueryValue(filters.birthPlace),
       yearId: normalizeQueryValue(filters.year),
       className: normalizeQueryValue(filters.classId ?? filters.className),
+      status: normalizeQueryValue(filters.status),
     };
     const pagination = sanitizePagination(filters);
     const { rows: rawRows, recordsAmount } =
       this.studentRepository.findAllByPeriod(periodId, {
         filters: sanitizedFilters,
         pagination,
+        deduplicate: periodId === "all",
       });
 
     const rows = rawRows.map((student) => ({
@@ -69,7 +67,9 @@ class StudentService {
       birthDate: student.birthDate,
       birthPlace: student.birthPlace,
       status: student.status,
-      _class: { id: student.className, year: student.yearId },
+      _class: student.className
+        ? { id: student.className, year: student.yearId }
+        : null,
     }));
     const filterData = this.periodService.getPeriodFilterData(periodId);
 
@@ -77,20 +77,47 @@ class StudentService {
       rows,
       recordsAmount,
       ...filterData,
-      studentFieldLabels,
+      studentFieldLabels: {
+        id: "Cédula",
+        firstName: "Nombres",
+        lastName: "Apellidos",
+        birthDate: "Fecha de Nacimiento",
+        birthPlace: "Lugar de Nacimiento",
+        class: periodId === "all" ? "Sección actual" : "Sección",
+        status: periodId === "all" ? "Estatus General" : "Estatus del Periodo",
+      },
     };
   }
 
   getStudentById(periodId, studentId) {
-    const period = this.periodRepository.findById(periodId);
-    this.isPeriod(period);
+    if (periodId !== "all") {
+      const period = this.periodRepository.findById(periodId);
+      this.isPeriod(period);
+    }
 
     const student = this.studentRepository.findById(studentId);
     if (!student) throw new Error("Estudiante no registrado");
 
+    const { rows } = this.studentRepository.findAllByPeriod(periodId, {
+      filters: { id: normalizeQueryValue(studentId) },
+      deduplicate: periodId === "all",
+    });
+    const enrollment = rows.find((row) => row.id === studentId);
+    if (enrollment) student.status = enrollment.status;
+    student._class = enrollment?.className
+      ? { id: enrollment.className, year: enrollment.yearId }
+      : null;
+
     return {
       student,
-      studentFieldLabels,
+      studentFieldLabels: {
+        id: "Cédula",
+        firstName: "Nombres",
+        lastName: "Apellidos",
+        birthDate: "Fecha de Nacimiento",
+        birthPlace: "Lugar de Nacimiento",
+        status: periodId === "all" ? "Estatus General" : "Estatus del Periodo",
+      },
     };
   }
 

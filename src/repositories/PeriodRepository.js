@@ -84,23 +84,30 @@ class PeriodRepository {
   }
 
   getStudentCount(id) {
-    const query = this.db
-      .prepare(`SELECT status, COUNT(*) as count FROM student_class WHERE class_id 
-              IN (SELECT id FROM class WHERE year_period_id 
-              IN (SELECT id FROM year_period WHERE period_id = ?))
-              GROUP BY status`);
-    const results = query.all(id);
+    const periodFilter = id === "all" ? "" : "WHERE year_period.period_id = ?";
+    const query = this.db.prepare(`
+      SELECT student_class.status, COUNT(*) as count
+      FROM student_class
+      JOIN class ON class.id = student_class.class_id
+      JOIN year_period ON year_period.id = class.year_period_id
+      ${periodFilter}
+      GROUP BY student_class.status
+    `);
+    const results = id === "all" ? query.all() : query.all(id);
     return results;
   }
 
   getGradeCount(id) {
-    const query = this.db.prepare(
-      `SELECT value IS NOT NULL as "loaded", COUNT(*) as count FROM grade WHERE year_subject_id 
-      IN (SELECT id FROM year_subject WHERE year_period_id 
-      IN (SELECT id FROM year_period WHERE period_id = ?))
-      GROUP BY 1`
-    )
-    const results = query.all(id);
+    const periodFilter = id === "all" ? "" : "WHERE year_period.period_id = ?";
+    const query = this.db.prepare(`
+      SELECT grade.value IS NOT NULL as "loaded", COUNT(*) as count
+      FROM grade
+      JOIN year_subject ON year_subject.id = grade.year_subject_id
+      JOIN year_period ON year_period.id = year_subject.year_period_id
+      ${periodFilter}
+      GROUP BY 1
+    `);
+    const results = id === "all" ? query.all() : query.all(id);
     return results;
   }
 

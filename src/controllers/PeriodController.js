@@ -43,6 +43,7 @@ class PeriodController {
         dateOfBirth,
         birthPlace,
         year,
+        status,
         page,
         limit,
       } = req.query;
@@ -55,6 +56,7 @@ class PeriodController {
         dateOfBirth,
         birthPlace,
         year,
+        status,
         classId,
         page,
         limit,

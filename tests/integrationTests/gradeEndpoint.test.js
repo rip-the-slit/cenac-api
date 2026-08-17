@@ -3,6 +3,7 @@ import app from "../../src/app";
 
 const ROOT = "/api/grades";
 const PERIOD_ID = "2090";
+const NEXT_PERIOD_ID = "2091";
 
 const students = {
   ana: "V-10000001",
@@ -80,6 +81,7 @@ describe("Grade Endpoint", () => {
       recordsAmount: expect.any(Number),
       studentGradesFieldLabels: {
         id: expect.any(String),
+        period: "Periodo Escolar",
         fullName: expect.any(String),
         status: expect.any(String),
         class: expect.any(String),
@@ -94,6 +96,7 @@ describe("Grade Endpoint", () => {
     res.body.rows.forEach((row) =>
       expect(row).toMatchObject({
         id: expect.any(String),
+        period: Number(PERIOD_ID),
         fullName: expect.any(String),
         status: expect.any(String),
         class: expect.any(String),
@@ -112,6 +115,7 @@ describe("Grade Endpoint", () => {
         expect.objectContaining({
           id: students.ana,
           fullName: "Alonso Ana",
+          period: Number(PERIOD_ID),
           status: "Aprobado",
           subjectAverages: { 1: 17 },
         }),
@@ -140,5 +144,84 @@ describe("Grade Endpoint", () => {
       [...expectedIds].sort()
     );
     expect(res.body.recordsAmount).toBe(recordsAmount);
+  });
+
+  test("returns separate grade rows for each period when periodId is all", async () => {
+    await supertest(app)
+      .post(`/api/periods/${PERIOD_ID}/archive`)
+      .send({ supersede: true })
+      .expect(200);
+    await supertest(app)
+      .post(`/api/periods/${NEXT_PERIOD_ID}/load`)
+      .send({
+        students: [
+          {
+            id: students.ana,
+            firstName: "Ana",
+            lastName: "Alonso",
+            birthDate: "2078-01-01",
+            birthPlace: "Caracas",
+            _class: { id: "C", year: 2 },
+          },
+        ],
+        subjects: { 2: [3] },
+      })
+      .expect(200, { loaded: true });
+    await supertest(app)
+      .post(`${ROOT}/load`)
+      .send({
+        periodId: NEXT_PERIOD_ID,
+        grades: [{ id: students.ana, subjects: { 3: [[14]] } }],
+      })
+      .expect(200, { loaded: 1, skipped: 0 });
+
+    const res = await supertest(app)
+      .get(ROOT)
+      .query({ periodId: "all" })
+      .expect(200);
+    const anaRows = res.body.rows.filter(({ id }) => id === students.ana);
+
+    expect(res.body.recordsAmount).toBe(4);
+    expect(res.body.studentGradesFieldLabels.period).toBe(
+      "Periodo Escolar"
+    );
+    expect(res.body.rows).toHaveLength(4);
+    expect(anaRows).toHaveLength(2);
+    expect(anaRows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          period: Number(PERIOD_ID),
+          subjectAverages: { 1: 17 },
+        }),
+        expect.objectContaining({
+          period: Number(NEXT_PERIOD_ID),
+          subjectAverages: { 3: 14 },
+        }),
+      ])
+    );
+    expect(res.body.years).toHaveLength(5);
+    expect(res.body.subjects).toHaveLength(14);
+    for (const year of res.body.years) {
+      expect(res.body.subjectsByYear[year.id]).toEqual(
+        res.body.subjects.map(({ id }) => id)
+      );
+    }
+
+    const filtered = await supertest(app)
+      .get(ROOT)
+      .query({ periodId: "all", q: "ana alonso" })
+      .expect(200);
+    expect(filtered.body.recordsAmount).toBe(2);
+    expect(filtered.body.rows.map(({ period }) => period).sort()).toEqual([
+      Number(PERIOD_ID),
+      Number(NEXT_PERIOD_ID),
+    ]);
+
+    const paged = await supertest(app)
+      .get(ROOT)
+      .query({ periodId: "all", page: 1, limit: 2 })
+      .expect(200);
+    expect(paged.body.recordsAmount).toBe(4);
+    expect(paged.body.rows).toHaveLength(2);
   });
 });

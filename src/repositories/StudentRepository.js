@@ -67,8 +67,13 @@ class StudentRepository {
   }
 
   _getPeriodStudentWhere(periodId, filters) {
-    const conditions = ["year_period.period_id = ?"];
-    const params = [periodId];
+    const conditions = [];
+    const params = [];
+
+    if (periodId !== "all") {
+      conditions.push("periodId = ?");
+      params.push(periodId);
+    }
 
     const addContainsFilter = (column, value) => {
       if (!value) return;
@@ -76,81 +81,126 @@ class StudentRepository {
       params.push(`%${value}%`);
     };
 
-    addContainsFilter("student.id", filters.id);
-    addContainsFilter("student.first_name", filters.firstName);
-    addContainsFilter("student.last_name", filters.lastName);
-    addContainsFilter("student.birth_date", filters.dateOfBirth);
-    addContainsFilter("student.birth_place", filters.birthPlace);
+    addContainsFilter("id", filters.id);
+    addContainsFilter("firstName", filters.firstName);
+    addContainsFilter("lastName", filters.lastName);
+    addContainsFilter("birthDate", filters.dateOfBirth);
+    addContainsFilter("birthPlace", filters.birthPlace);
 
     if (filters.yearId) {
-      conditions.push("CAST(year_period.year_id AS TEXT) = ?");
+      conditions.push("CAST(yearId AS TEXT) = ?");
       params.push(filters.yearId);
     }
 
     if (filters.className) {
-      conditions.push("LOWER(class.name) = ?");
+      conditions.push("LOWER(className) = ?");
       params.push(filters.className);
     }
 
     if (filters.status) {
-      conditions.push("LOWER(student_class.status) = ?");
+      conditions.push("LOWER(status) = ?");
       params.push(filters.status);
     }
 
     if (filters.q) {
       conditions.push(`(
-        LOWER(student.first_name || ' ' || student.last_name) LIKE ?
-        OR LOWER(student.id) LIKE ?
+        LOWER(firstName || ' ' || lastName) LIKE ?
+        OR LOWER(id) LIKE ?
       )`);
       params.push(`%${filters.q}%`, `%${filters.q}%`);
     }
 
-    return { where: conditions.join(" AND "), params };
+    return {
+      where: conditions.length > 0 ? conditions.join(" AND ") : "1 = 1",
+      params,
+    };
   }
 
-  findAllByPeriod(periodId, { filters = {}, pagination = null } = {}) {
+  findAllByPeriod(
+    periodId,
+    { filters = {}, pagination = null, deduplicate = false } = {}
+  ) {
+    const shouldDeduplicate = periodId === "all" && deduplicate;
     const { where, params } = this._getPeriodStudentWhere(periodId, filters);
-    const joins = `
+    const paginationSql = pagination ? "LIMIT ? OFFSET ?" : "";
+    const rowParams = pagination
+      ? [...params, pagination.limit, pagination.offset]
+      : params;
+
+    const loadedValue = (column) => shouldDeduplicate
+      ? `CASE WHEN period.status = 'loaded' THEN ${column} END`
+      : column;
+    const status = shouldDeduplicate
+      ? "student.status"
+      : "student_class.status";
+    const rankedCondition = shouldDeduplicate ? "enrollmentRank = 1 AND" : "";
+
+    const studentRowsQuery = `
+      WITH student_rows AS (
+        SELECT
+          student.id,
+          student.first_name as "firstName",
+          student.last_name as "lastName",
+          student.birth_date as "birthDate",
+          student.birth_place as "birthPlace",
+          ${status} as "status",
+          ${loadedValue("class.id")} as "classDatabaseId",
+          ${loadedValue("class.name")} as "className",
+          ${loadedValue("year_period.id")} as "yearPeriodId",
+          ${loadedValue("year_period.year_id")} as "yearId",
+          ${loadedValue("year.name")} as "yearName",
+          period.id as "periodId",
+          period.status as "periodStatus",
+          period.start_year as "periodStartYear",
+          ROW_NUMBER() OVER (
+            PARTITION BY student.id
+            ORDER BY CASE WHEN period.status = 'loaded' THEN 0 ELSE 1 END,
+              period.start_year DESC
+          ) as "enrollmentRank"
       FROM student
       JOIN student_class ON student_class.student_id = student.id
       JOIN class ON class.id = student_class.class_id
       JOIN year_period ON year_period.id = class.year_period_id
       JOIN year ON year.id = year_period.year_id
-      WHERE ${where}
+      JOIN period ON period.id = year_period.period_id
+      )
+    `;
+    const filteredRowsQuery = `
+      FROM student_rows
+      WHERE ${rankedCondition} ${where}
+    `;
+    const studentColumns = `
+      id,
+      firstName,
+      lastName,
+      birthDate,
+      birthPlace,
+      status,
+      classDatabaseId,
+      className,
+      yearPeriodId,
+      yearId,
+      yearName,
+      periodId,
+      periodStatus,
+      periodStartYear
+    `;
+    const orderQuery = `
+      ORDER BY lastName COLLATE NOCASE ASC,
+        firstName COLLATE NOCASE ASC,
+        id ASC
     `;
 
     const countRow = this.db.prepare(`
+      ${studentRowsQuery}
       SELECT COUNT(*) as "recordsAmount"
-      ${joins}
+      ${filteredRowsQuery}
     `).get(...params);
-
-    const paginationSql = pagination ? "LIMIT ? OFFSET ?" : "";
-    const rowParams = pagination
-      ? [...params, pagination.limit, pagination.offset]
-      : params;
-    const studentColumns = `
-      student.id,
-      student.first_name as "firstName",
-      student.last_name as "lastName",
-      student.birth_date as "birthDate",
-      student.birth_place as "birthPlace",
-      student_class.status,
-      class.id as "classDatabaseId",
-      class.name as "className",
-      year_period.id as "yearPeriodId",
-      year_period.year_id as "yearId",
-      year.name as "yearName"
-    `;
-    const order = `
-      ORDER BY student.last_name COLLATE NOCASE ASC,
-        student.first_name COLLATE NOCASE ASC,
-        student.id ASC
-    `;
-
     const rows = this.db.prepare(`
+      ${studentRowsQuery}
       SELECT ${studentColumns}
-      ${joins}
-      ${order}
+      ${filteredRowsQuery}
+      ${orderQuery}
       ${paginationSql}
     `).all(...rowParams);
 
@@ -256,11 +306,16 @@ class StudentRepository {
   }
 
   findAssignedClassByPeriod(studentId, periodId) {
-    const query = this.db
-      .prepare(`SELECT class.id, class.name, class.shift, class.location, class.capacity, class.year_period_id as "yearPeriodId"
-                                  FROM student_class JOIN class ON student_class.student_id = ? AND student_class.class_id = class.id
-                                  WHERE class.year_period_id = (SELECT year_period.id FROM year_period WHERE year_period.period_id = ?)`);
+    const query = this.db.prepare(`
+      SELECT class.id, class.name, class.shift, class.location, class.capacity,
+        class.year_period_id as "yearPeriodId"
+      FROM student_class
+      JOIN class ON class.id = student_class.class_id
+      JOIN year_period ON year_period.id = class.year_period_id
+      WHERE student_class.student_id = ? AND year_period.period_id = ?
+    `);
     const result = query.get(studentId, periodId);
+    if (!result) return null;
     return new Class(
       result.id,
       result.name,

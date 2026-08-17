@@ -3,15 +3,8 @@ import PeriodRepository from "../repositories/PeriodRepository.js";
 import YearRepository from "../repositories/YearRepository.js";
 import StudentRepository from "../repositories/StudentRepository.js";
 import { Grade } from "../models/index.js";
-import { normalizeQueryValue, sanitizePagination } from "./queryUtils.js";
+import { normalizeQueryValue, sanitizePagination, toNumberOrNull } from "./queryUtils.js";
 import PeriodService from "./PeriodService.js";
-
-function toNumberOrNull(value) {
-  if (value === null || value === undefined || value === "") return null;
-
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-}
 
 class GradeService {
   constructor(
@@ -90,11 +83,14 @@ class GradeService {
   }
 
   _parseGradeRows(studentRows, gradeRows) {
+    const enrollmentKey = (studentId, periodId) => JSON.stringify([studentId, periodId]);
+
     const students = new Map(
       studentRows.map((student) => [
-        student.id,
+        enrollmentKey(student.id, student.periodId),
         {
           id: student.id,
+          period: student.periodStartYear,
           fullName: `${student.lastName} ${student.firstName}`,
           status: student.status,
           class: `${student.yearName || student.yearId} ${student.className}`,
@@ -104,7 +100,9 @@ class GradeService {
     );
 
     for (const rawGrade of gradeRows) {
-      const student = students.get(rawGrade.studentId);
+      const student = students.get(
+        enrollmentKey(rawGrade.studentId, rawGrade.periodId)
+      );
       if (!student) continue;
 
       const subjectId = String(rawGrade.subjectId);
@@ -145,8 +143,10 @@ class GradeService {
 
   // GET /grades?periodId&yearId&classId&status&q&page&limit
   getGrades(periodId, filters = {}) {
-    const period = this.periodRepository.findById(periodId);
-    if (!period) throw new Error("Periodo Escolar no registrado");
+    if (periodId !== "all") {
+      const period = this.periodRepository.findById(periodId);
+      if (!period) throw new Error("Periodo Escolar no registrado");
+    }
 
     const sanitizedFilters = {
       yearId: normalizeQueryValue(filters.yearId),
@@ -173,6 +173,7 @@ class GradeService {
       recordsAmount,
       studentGradesFieldLabels: {
         id: "Cédula",
+        period: "Periodo Escolar",
         fullName: "Nombre Completo",
         status: "Estatus",
         class: "Sección",

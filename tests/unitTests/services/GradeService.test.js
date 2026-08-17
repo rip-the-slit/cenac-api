@@ -11,6 +11,8 @@ describe("GradeService", () => {
         yearName: "Primer Año",
         yearId: 1,
         className: "A",
+        periodId: "2025",
+        periodStartYear: 2025,
       },
       {
         id: "V-10000002",
@@ -20,6 +22,8 @@ describe("GradeService", () => {
         yearName: "Primer Año",
         yearId: 1,
         className: "B",
+        periodId: "2025",
+        periodStartYear: 2025,
       },
     ];
 
@@ -28,6 +32,7 @@ describe("GradeService", () => {
         {
           gradeId: 1,
           studentId: "V-10000001",
+          periodId: "2025",
           subjectId: 1,
           term: 1,
           strategy: 1,
@@ -38,6 +43,7 @@ describe("GradeService", () => {
         {
           gradeId: 2,
           studentId: "V-10000001",
+          periodId: "2025",
           subjectId: 1,
           term: 1,
           strategy: 2,
@@ -48,6 +54,7 @@ describe("GradeService", () => {
         {
           gradeId: 3,
           studentId: "V-10000001",
+          periodId: "2025",
           subjectId: 3,
           term: 2,
           strategy: 1,
@@ -61,6 +68,7 @@ describe("GradeService", () => {
 
       expect(student).toEqual({
         id: "V-10000001",
+        period: 2025,
         fullName: "Alonso Ana",
         status: "Aprobado",
         class: "Primer Año A",
@@ -97,6 +105,18 @@ describe("GradeService", () => {
         {
           gradeId: 4,
           studentId: "V-99999999",
+          periodId: "2025",
+          subjectId: 1,
+          term: 1,
+          strategy: 1,
+          value: 20,
+          subjectAverage: 20,
+          termAverage: 20,
+        },
+        {
+          gradeId: 5,
+          studentId: "V-10000001",
+          periodId: "2024",
           subjectId: 1,
           term: 1,
           strategy: 1,
@@ -114,6 +134,82 @@ describe("GradeService", () => {
         Object.keys(student.grades).length === 0 &&
         Object.keys(student.subjectAverages).length === 0
       ))).toBe(true);
+    });
+
+    test("keeps grades isolated for the same student in different periods", () => {
+      const repeatedStudentRows = [
+        {
+          ...studentRows[0],
+          periodId: "2024",
+          periodStartYear: 2024,
+          yearName: "Primer Año",
+          className: "A",
+        },
+        {
+          ...studentRows[0],
+          periodId: "2025",
+          periodStartYear: 2025,
+          yearName: "Segundo Año",
+          className: "B",
+        },
+      ];
+      const gradeRows = [
+        {
+          studentId: "V-10000001",
+          periodId: "2024",
+          subjectId: 1,
+          term: 1,
+          strategy: 1,
+          value: 18,
+          subjectAverage: 18,
+          termAverage: 18,
+        },
+        {
+          studentId: "V-10000001",
+          periodId: "2025",
+          subjectId: 1,
+          term: 1,
+          strategy: 1,
+          value: 12,
+          subjectAverage: 12,
+          termAverage: 12,
+        },
+      ];
+
+      const result = GradeService._parseGradeRows(
+        repeatedStudentRows,
+        gradeRows
+      );
+
+      expect(result).toHaveLength(2);
+      expect(result).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: "V-10000001",
+            period: 2024,
+            subjectAverages: { 1: 18 },
+            grades: expect.objectContaining({
+              1: expect.objectContaining({
+                terms: expect.arrayContaining([
+                  [18, null, null, null],
+                ]),
+              }),
+            }),
+          }),
+          expect.objectContaining({
+            id: "V-10000001",
+            period: 2025,
+            subjectAverages: { 1: 12 },
+            grades: expect.objectContaining({
+              1: expect.objectContaining({
+                terms: expect.arrayContaining([
+                  [12, null, null, null],
+                ]),
+              }),
+            }),
+          }),
+        ])
+      );
     });
   });
 });

@@ -58,6 +58,9 @@ class SubjectRepository {
     }
 
     const placeholders = studentIds.map(() => "?").join(", ");
+    const periodFilter = periodId === "all"
+      ? ""
+      : "AND year_period.period_id = ?";
     const query = this.db.prepare(`
       WITH selected_grades AS (
         SELECT grade.id as "gradeId",
@@ -66,12 +69,13 @@ class SubjectRepository {
           grade.strategy,
           grade.value,
           year_subject.id as "yearSubjectId",
-          year_subject.subject_id as "subjectId"
+          year_subject.subject_id as "subjectId",
+          year_period.period_id as "periodId"
         FROM grade
         JOIN year_subject ON year_subject.id = grade.year_subject_id
         JOIN year_period ON year_period.id = year_subject.year_period_id
-        WHERE year_period.period_id = ?
-          AND grade.student_id IN (${placeholders})
+        WHERE grade.student_id IN (${placeholders})
+          ${periodFilter}
       ),
       subject_averages AS (
         SELECT studentId, yearSubjectId, AVG(value) as "subjectAverage"
@@ -102,7 +106,10 @@ class SubjectRepository {
         selected_grades.strategy ASC
     `);
 
-    return query.all(periodId, ...studentIds);
+    const params = periodId === "all"
+      ? studentIds
+      : [...studentIds, periodId];
+    return query.all(...params);
   }
   create(subject) {
     const query = this.db.prepare(`
