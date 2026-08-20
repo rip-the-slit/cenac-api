@@ -1,5 +1,7 @@
 import GradeService from "../../../src/services/GradeService";
 
+const GRADE_SLOTS_PER_TERM = 5;
+
 describe("GradeService", () => {
   describe("_parseGradeRows", () => {
     const studentRows = [
@@ -7,7 +9,7 @@ describe("GradeService", () => {
         id: "V-10000001",
         firstName: "Ana",
         lastName: "Alonso",
-        status: "Aprobado",
+        status: "passed",
         yearName: "Primer Año",
         yearId: 1,
         className: "A",
@@ -18,7 +20,7 @@ describe("GradeService", () => {
         id: "V-10000002",
         firstName: "Bruno",
         lastName: "Benitez",
-        status: "Reprobado",
+        status: "failed",
         yearName: "Primer Año",
         yearId: 1,
         className: "B",
@@ -70,24 +72,24 @@ describe("GradeService", () => {
         id: "V-10000001",
         period: 2025,
         fullName: "Alonso Ana",
-        status: "Aprobado",
+        status: "passed",
         class: "Primer Año A",
         grades: {
           1: {
             avg: 17,
             terms: [
-              [18, 16, null, null],
-              [null, null, null, null],
-              [null, null, null, null],
+              [18, 16, null, null, null],
+              [null, null, null, null, null],
+              [null, null, null, null, null],
             ],
             termAverages: [17, null, null],
           },
           3: {
             avg: 15,
             terms: [
-              [null, null, null, null],
-              [15, null, null, null],
-              [null, null, null, null],
+              [null, null, null, null, null],
+              [15, null, null, null, null],
+              [null, null, null, null, null],
             ],
             termAverages: [null, 15, null],
           },
@@ -191,7 +193,7 @@ describe("GradeService", () => {
             grades: expect.objectContaining({
               1: expect.objectContaining({
                 terms: expect.arrayContaining([
-                  [18, null, null, null],
+                  [18, null, null, null, null],
                 ]),
               }),
             }),
@@ -203,7 +205,7 @@ describe("GradeService", () => {
             grades: expect.objectContaining({
               1: expect.objectContaining({
                 terms: expect.arrayContaining([
-                  [12, null, null, null],
+                  [12, null, null, null, null],
                 ]),
               }),
             }),

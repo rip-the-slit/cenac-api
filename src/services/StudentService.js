@@ -71,7 +71,9 @@ class StudentService {
         ? { id: student.className, year: student.yearId }
         : null,
     }));
-    const filterData = this.periodService.getPeriodFilterData(periodId);
+    const filterData = this.periodService.getPeriodFilterData(periodId, {
+      useGeneralStatuses: periodId === "all",
+    });
 
     return {
       rows,

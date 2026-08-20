@@ -6,6 +6,8 @@ import { Grade } from "../models/index.js";
 import { normalizeQueryValue, sanitizePagination, toNumberOrNull } from "./queryUtils.js";
 import PeriodService from "./PeriodService.js";
 
+const GRADE_SLOTS_PER_TERM = 5;
+
 class GradeService {
   constructor(
     subjectRepository,
@@ -41,10 +43,10 @@ class GradeService {
     total /= subjects.length;
 
     if (total < subjects[0].minimumGrade) {
-      return { status: "Reprobado", classId: assignedClass.id };
+      return { status: "failed", classId: assignedClass.id };
     }
 
-    return { status: "Aprobado", classId: assignedClass.id };
+    return { status: "passed", classId: assignedClass.id };
   }
 
   // Builds { [yearId]: [subjectId, ...] } for a period using existing repositories
@@ -109,7 +111,10 @@ class GradeService {
       if (!student.grades[subjectId]) {
         student.grades[subjectId] = {
           avg: toNumberOrNull(rawGrade.subjectAverage),
-          terms: Array.from({ length: 3 }, () => Array(4).fill(null)),
+          terms: Array.from(
+            { length: 3 },
+            () => Array(GRADE_SLOTS_PER_TERM).fill(null)
+          ),
           termAverages: Array(3).fill(null),
         };
       }
@@ -180,7 +185,6 @@ class GradeService {
         grades: "Notas",
       },
       ...filterData,
-      statuses: ["Aprobado", "Reprobado"],
     };
   }
 
@@ -232,6 +236,7 @@ class GradeService {
               const strategy =
                 (isObj && Number(rawGrade.strategy)) || strategyIndex + 1;
               const id = isObj ? rawGrade.id : null;
+              if (strategy < 1 || strategy > GRADE_SLOTS_PER_TERM) return;
 
               const grade = new Grade(
                 id,

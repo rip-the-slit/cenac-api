@@ -91,7 +91,11 @@ describe("Grade Endpoint", () => {
       classesByYear: expect.any(Object),
       subjects: expect.any(Array),
       subjectsByYear: expect.any(Object),
-      statuses: expect.any(Array),
+      statuses: [
+        { value: "pending", name: "Pendiente" },
+        { value: "passed", name: "Aprobado" },
+        { value: "failed", name: "Reprobado" },
+      ],
     });
     res.body.rows.forEach((row) =>
       expect(row).toMatchObject({
@@ -116,12 +120,12 @@ describe("Grade Endpoint", () => {
           id: students.ana,
           fullName: "Alonso Ana",
           period: Number(PERIOD_ID),
-          status: "Aprobado",
+          status: "passed",
           subjectAverages: { 1: 17 },
         }),
         expect.objectContaining({
           id: students.bruno,
-          status: "Reprobado",
+          status: "failed",
           subjectAverages: { 1: 7 },
         }),
       ])
@@ -131,7 +135,7 @@ describe("Grade Endpoint", () => {
   test.each([
     ["year", { yearId: 2 }, [students.carla], 1],
     ["class", { classId: "B" }, [students.bruno], 1],
-    ["status", { status: "Aprobado" }, [students.ana], 1],
+    ["status", { status: "passed" }, [students.ana], 1],
     ["name", { q: "ana alonso" }, [students.ana], 1],
     ["page", { page: 1, limit: 2 }, [students.ana, students.bruno], 3],
   ])("filters by %s", async (_filter, query, expectedIds, recordsAmount) => {

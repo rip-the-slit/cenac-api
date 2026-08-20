@@ -28,7 +28,10 @@ class PeriodService {
     return this.periodRepository.findAll();
   }
 
-  getPeriodFilterData(periodId, { includeSubjects = false } = {}) {
+  getPeriodFilterData(
+    periodId,
+    { includeSubjects = false, useGeneralStatuses = false } = {}
+  ) {
     const isAllPeriods = periodId === "all";
     const years = isAllPeriods
       ? this.yearRepository.findAll()
@@ -79,7 +82,17 @@ class PeriodService {
       }
     }
 
-    const filterData = { years, classesByYear };
+    const statuses = useGeneralStatuses
+      ? [
+          { value: "active", name: "Activo" },
+          { value: "inactive", name: "Inactivo" },
+        ]
+      : [
+          { value: "pending", name: "Pendiente" },
+          { value: "passed", name: "Aprobado" },
+          { value: "failed", name: "Reprobado" },
+        ];
+    const filterData = { years, classesByYear, statuses };
     if (!includeSubjects) return filterData;
 
     const subjects = isAllPeriods
@@ -117,8 +130,8 @@ class PeriodService {
 
     const studentCount = this.periodRepository.getStudentCount(id);
     const totalStudents = studentCount.reduce((t, c) => t + c.count, 0);
-    const approvedStudents =
-      studentCount.find((c) => c.status === "approved")?.count || 0;
+    const passedStudents =
+      studentCount.find((c) => c.status === "passed")?.count || 0;
 
     period.stats =
       period.status === "new"
@@ -127,7 +140,7 @@ class PeriodService {
             loadedGrades + notLoadedGrades,
             loadedGrades,
             totalStudents,
-            approvedStudents
+            passedStudents
           );
 
     return period;
@@ -139,7 +152,7 @@ class PeriodService {
     }
 
     return !periodList.some(
-      (period) => period.status === "new" || period.status === "loaded"
+      (period) => period.status === "new" || period.status === "active"
     );
   }
 
@@ -273,43 +286,45 @@ class PeriodService {
       this.studentRepository.assignToClass(
         student.id,
         existingClass.id,
-        "Reprobado"
+        "pending"
       );
     }
 
-    this.periodRepository.update(periodId, { ...period, status: "loaded" });
+    this.periodRepository.update(periodId, { ...period, status: "active" });
 
     return { loaded: true };
   }
 
   archivePeriod(periodId, supersede) {
-    const period = this.periodRepository.findById(periodId);
-    this.isPeriod(period);
+    return this.periodRepository.db.transaction(() => {
+      const period = this.periodRepository.findById(periodId);
+      this.isPeriod(period);
 
-    this.periodRepository.update(periodId, { ...period, status: "archived" });
+      this.periodRepository.update(periodId, { ...period, status: "archived" });
 
-    if (!supersede) return;
+      if (!supersede) return;
 
-    const newPeriod = new Period(
-      period.endYear,
-      "new",
-      period.endYear,
-      period.endYear + 1,
-      period.openingDate,
-      null
-    );
-
-    const periodList = this.periodRepository.findAll();
-
-    if (!this.isPeriodListAddable(periodList)) {
-      throw new Error(
-        "No se puede agregar un nuevo periodo sin haber archivado los demás"
+      const newPeriod = new Period(
+        period.endYear,
+        "new",
+        period.endYear,
+        period.endYear + 1,
+        period.openingDate,
+        null
       );
-    }
-    
-    this.periodRepository.create(newPeriod);
 
-    return this.periodRepository.findById(newPeriod.id);
+      const periodList = this.periodRepository.findAll();
+
+      if (!this.isPeriodListAddable(periodList)) {
+        throw new Error(
+          "No se puede agregar un nuevo periodo sin haber archivado los demás"
+        );
+      }
+
+      this.periodRepository.create(newPeriod);
+
+      return this.periodRepository.findById(newPeriod.id);
+    });
   }
 }
 

@@ -127,8 +127,8 @@ class StudentRepository {
       ? [...params, pagination.limit, pagination.offset]
       : params;
 
-    const loadedValue = (column) => shouldDeduplicate
-      ? `CASE WHEN period.status = 'loaded' THEN ${column} END`
+    const activePeriodValue = (column) => shouldDeduplicate
+      ? `CASE WHEN period.status = 'active' THEN ${column} END`
       : column;
     const status = shouldDeduplicate
       ? "student.status"
@@ -144,17 +144,17 @@ class StudentRepository {
           student.birth_date as "birthDate",
           student.birth_place as "birthPlace",
           ${status} as "status",
-          ${loadedValue("class.id")} as "classDatabaseId",
-          ${loadedValue("class.name")} as "className",
-          ${loadedValue("year_period.id")} as "yearPeriodId",
-          ${loadedValue("year_period.year_id")} as "yearId",
-          ${loadedValue("year.name")} as "yearName",
+          ${activePeriodValue("class.id")} as "classDatabaseId",
+          ${activePeriodValue("class.name")} as "className",
+          ${activePeriodValue("year_period.id")} as "yearPeriodId",
+          ${activePeriodValue("year_period.year_id")} as "yearId",
+          ${activePeriodValue("year.name")} as "yearName",
           period.id as "periodId",
           period.status as "periodStatus",
           period.start_year as "periodStartYear",
           ROW_NUMBER() OVER (
             PARTITION BY student.id
-            ORDER BY CASE WHEN period.status = 'loaded' THEN 0 ELSE 1 END,
+            ORDER BY CASE WHEN period.status = 'active' THEN 0 ELSE 1 END,
               period.start_year DESC
           ) as "enrollmentRank"
       FROM student

@@ -75,9 +75,9 @@ export class Period {
 }
 
 export class PeriodStats {
-  constructor(totalGrades, loadedGrades, totalStudents, approvedStudents) {
+  constructor(totalGrades, loadedGrades, totalStudents, passedStudents) {
     this.grades = { total: totalGrades, loaded: loadedGrades };
-    this.students = { total: totalStudents, approved: approvedStudents };
+    this.students = { total: totalStudents, passed: passedStudents };
   }
 }
 

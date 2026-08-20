@@ -83,6 +83,11 @@ describe("Period Endpoint", () => {
       recordsAmount: expect.any(Number),
       years: expect.any(Array),
       classesByYear: expect.any(Object),
+      statuses: [
+        { value: "pending", name: "Pendiente" },
+        { value: "passed", name: "Aprobado" },
+        { value: "failed", name: "Reprobado" },
+      ],
       studentFieldLabels: {
         id: expect.any(String),
         firstName: expect.any(String),
@@ -131,8 +136,8 @@ describe("Period Endpoint", () => {
     ["year", { year: 2 }, [students.carla], 1],
     ["class", { class: "B" }, [students.bruno], 1],
     [
-      "status",
-      { status: "Reprobado" },
+      "pending",
+      { status: "pending" },
       [students.ana, students.bruno, students.carla],
       3,
     ],
@@ -159,7 +164,7 @@ describe("Period Endpoint", () => {
 
     expect(res.body.student).toMatchObject({
       id: students.ana,
-      status: "Reprobado",
+      status: "pending",
       _class: { id: "A", year: 1 },
     });
     expect(res.body.studentFieldLabels.status).toBe("Estatus del Periodo");
@@ -225,7 +230,7 @@ describe("Period Endpoint", () => {
       closingDate: null,
       stats: {
         grades: { total: 0, loaded: 0 },
-        students: { total: 5, approved: 0 },
+        students: { total: 5, passed: 0 },
       },
     });
   });
@@ -237,6 +242,10 @@ describe("Period Endpoint", () => {
 
     expect(res.body.recordsAmount).toBe(4);
     expect(res.body.studentFieldLabels.status).toBe("Estatus General");
+    expect(res.body.statuses).toEqual([
+      { value: "active", name: "Activo" },
+      { value: "inactive", name: "Inactivo" },
+    ]);
     expect(res.body.rows.map(({ id }) => id)).toEqual([
       students.ana,
       students.bruno,

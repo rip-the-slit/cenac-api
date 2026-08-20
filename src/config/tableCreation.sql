@@ -35,7 +35,9 @@ CREATE TABLE IF NOT EXISTS guardian (
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
     birth_date DATE,
-    legal_role TEXT
+    legal_role TEXT NOT NULL,
+    phone TEXT,
+    address TEXT
 );
 
 CREATE TABLE IF NOT EXISTS student (
@@ -44,12 +46,12 @@ CREATE TABLE IF NOT EXISTS student (
     last_name TEXT NOT NULL,
     birth_date DATE,
     birth_place TEXT,
-    status TEXT
+    status TEXT CHECK(status IN ("active", "inactive"))
 );
 
 CREATE TABLE IF NOT EXISTS period (
     id TEXT PRIMARY KEY,
-    status TEXT DEFAULT "new",
+    status TEXT DEFAULT "new" CHECK(status IN ("new", "active", "archived")),
     start_year INTEGER,
     end_year INTEGER,
     opening_date DATE,
@@ -108,7 +110,7 @@ CREATE TABLE IF NOT EXISTS student_guardian (
 CREATE TABLE IF NOT EXISTS student_class (
     student_id TEXT,
     class_id INTEGER,
-    status TEXT,
+    status TEXT DEFAULT "pending" CHECK(status IN ("pending", "passed", "failed")),
     PRIMARY KEY (student_id, class_id),
     FOREIGN KEY (student_id) REFERENCES student(id),
     FOREIGN KEY (class_id) REFERENCES class(id)
