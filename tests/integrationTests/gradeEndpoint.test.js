@@ -128,6 +128,21 @@ describe("Grade Endpoint", () => {
           status: "failed",
           subjectAverages: { 1: 7 },
         }),
+        expect.objectContaining({
+          id: students.carla,
+          subjectAverages: { 3: null },
+          subjectDetails: {
+            3: {
+              avg: null,
+              terms: [
+                [null, null, null, null, null],
+                [null, null, null, null, null],
+                [null, null, null, null, null],
+              ],
+              termAverages: [null, null, null],
+            },
+          },
+        }),
       ])
     );
   });
@@ -195,11 +210,11 @@ describe("Grade Endpoint", () => {
       expect.arrayContaining([
         expect.objectContaining({
           period: Number(PERIOD_ID),
-          subjectAverages: { 1: 17 },
+          subjectAverages: expect.objectContaining({ 1: 17 }),
         }),
         expect.objectContaining({
           period: Number(NEXT_PERIOD_ID),
-          subjectAverages: { 3: 14 },
+          subjectAverages: expect.objectContaining({ 3: 14 }),
         }),
       ])
     );

@@ -84,8 +84,16 @@ class GradeService {
     return map;
   }
 
-  _parseGradeRows(studentRows, gradeRows) {
+  _parseGradeRows(studentRows, gradeRows, subjectsByYear = {}) {
     const enrollmentKey = (studentId, periodId) => JSON.stringify([studentId, periodId]);
+    const emptySubjectGrades = () => ({
+      avg: null,
+      terms: Array.from(
+        { length: 3 },
+        () => Array(GRADE_SLOTS_PER_TERM).fill(null)
+      ),
+      termAverages: Array(3).fill(null),
+    });
 
     const students = new Map(
       studentRows.map((student) => [
@@ -96,7 +104,12 @@ class GradeService {
           fullName: `${student.lastName} ${student.firstName}`,
           status: student.status,
           class: `${student.yearName || student.yearId} ${student.className}`,
-          grades: {},
+          grades: Object.fromEntries(
+            (subjectsByYear[student.yearId] || []).map((subjectId) => [
+              String(subjectId),
+              emptySubjectGrades(),
+            ])
+          ),
         },
       ])
     );
@@ -109,17 +122,11 @@ class GradeService {
 
       const subjectId = String(rawGrade.subjectId);
       if (!student.grades[subjectId]) {
-        student.grades[subjectId] = {
-          avg: toNumberOrNull(rawGrade.subjectAverage),
-          terms: Array.from(
-            { length: 3 },
-            () => Array(GRADE_SLOTS_PER_TERM).fill(null)
-          ),
-          termAverages: Array(3).fill(null),
-        };
+        student.grades[subjectId] = emptySubjectGrades();
       }
 
       const subjectGrades = student.grades[subjectId];
+      subjectGrades.avg ??= toNumberOrNull(rawGrade.subjectAverage);
       const termIndex = Number(rawGrade.term) - 1;
       const strategyIndex = Number(rawGrade.strategy) - 1;
       if (
@@ -174,7 +181,11 @@ class GradeService {
     });
 
     return {
-      rows: this._parseGradeRows(studentRows, gradeRows),
+      rows: this._parseGradeRows(
+        studentRows,
+        gradeRows,
+        filterData.subjectsByYear
+      ),
       recordsAmount,
       studentGradesFieldLabels: {
         id: "Cédula",

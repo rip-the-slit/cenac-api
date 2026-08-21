@@ -66,7 +66,11 @@ describe("GradeService", () => {
         },
       ];
 
-      const [student] = GradeService._parseGradeRows(studentRows, gradeRows);
+      const [student] = GradeService._parseGradeRows(
+        studentRows,
+        gradeRows,
+        { 1: [1, 2, 3] }
+      );
 
       expect(student).toEqual({
         id: "V-10000001",
@@ -84,6 +88,15 @@ describe("GradeService", () => {
             ],
             termAverages: [17, null, null],
           },
+          2: {
+            avg: null,
+            terms: [
+              [null, null, null, null, null],
+              [null, null, null, null, null],
+              [null, null, null, null, null],
+            ],
+            termAverages: [null, null, null],
+          },
           3: {
             avg: 15,
             terms: [
@@ -94,9 +107,10 @@ describe("GradeService", () => {
             termAverages: [null, 15, null],
           },
         },
-        subjectAverages: { 1: 17, 3: 15 },
+        subjectAverages: { 1: 17, 2: null, 3: 15 },
         subjectDetails: {
           1: expect.any(Object),
+          2: expect.any(Object),
           3: expect.any(Object),
         },
       });
