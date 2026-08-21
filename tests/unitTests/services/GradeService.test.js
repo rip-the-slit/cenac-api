@@ -3,6 +3,34 @@ import GradeService from "../../../src/services/GradeService";
 const GRADE_SLOTS_PER_TERM = 5;
 
 describe("GradeService", () => {
+  describe("_getStudentClassStatus", () => {
+    test.each([
+      [
+        "passed",
+        [12, 15, 18, 10, 14].map((average) => ({
+          average,
+          minimumGrade: 10,
+        })),
+      ],
+      [
+        "pending",
+        [12, 15, 8, 6, null].map((average) => ({
+          average,
+          minimumGrade: 10,
+        })),
+      ],
+      [
+        "failed",
+        [12, 8, 7, 6, null].map((average) => ({
+          average,
+          minimumGrade: 10,
+        })),
+      ],
+    ])("returns %s from individual subject results", (status, subjects) => {
+      expect(GradeService._getStudentClassStatus(subjects)).toBe(status);
+    });
+  });
+
   describe("_parseGradeRows", () => {
     const studentRows = [
       {

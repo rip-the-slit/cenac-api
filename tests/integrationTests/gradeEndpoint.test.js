@@ -125,7 +125,7 @@ describe("Grade Endpoint", () => {
         }),
         expect.objectContaining({
           id: students.bruno,
-          status: "failed",
+          status: "pending",
           subjectAverages: { 1: 7 },
         }),
         expect.objectContaining({
@@ -150,7 +150,7 @@ describe("Grade Endpoint", () => {
   test.each([
     ["year", { yearId: 2 }, [students.carla], 1],
     ["class", { classId: "B" }, [students.bruno], 1],
-    ["status", { status: "passed" }, [students.ana], 1],
+    ["status", { status: "pending" }, [students.bruno, students.carla], 2],
     ["name", { q: "ana alonso" }, [students.ana], 1],
     ["page", { page: 1, limit: 2 }, [students.ana, students.bruno], 3],
   ])("filters by %s", async (_filter, query, expectedIds, recordsAmount) => {

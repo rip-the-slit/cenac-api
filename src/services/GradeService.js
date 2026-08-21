@@ -23,30 +23,21 @@ class GradeService {
     this.periodService = periodService;
   }
 
-  _getStudentClassStatus(studentId, periodId) {
-    const assignedClass = this.studentRepository.findAssignedClassByPeriod(
-      studentId,
-      periodId
-    );
-    const yearPeriodId = assignedClass.yearPeriodId;
-    const subjects = this.yearRepository.findAllAssignedSubjects(yearPeriodId);
+  _getStudentClassStatus(assignedSubjects) {
+    const subjectsPassed = assignedSubjects.filter(
+      ({ average, minimumGrade }) =>
+        average !== null && average >= minimumGrade
+    ).length;
 
-    let total = 0;
-    for (const subject of subjects) {
-      const avg = this.subjectRepository.getGradeAvgByStudent(
-        subject.yearSubjectId,
-        studentId
-      );
-      total += avg;
+    if (subjectsPassed === assignedSubjects.length) {
+      return "passed";
     }
 
-    total /= subjects.length;
-
-    if (total < subjects[0].minimumGrade) {
-      return { status: "failed", classId: assignedClass.id };
+    if (subjectsPassed >= assignedSubjects.length - 3) {
+      return "pending";
     }
 
-    return { status: "passed", classId: assignedClass.id };
+    return "failed";
   }
 
   // Builds { [yearId]: [subjectId, ...] } for a period using existing repositories
@@ -66,19 +57,22 @@ class GradeService {
       firstName: student.firstName,
       lastName: student.lastName,
       status: student.status,
-      classId: student.className,
+      classId: student.classDatabaseId,
       yearId: student.yearId,
     }));
   }
 
-  // Builds a map: `${yearId}-${subjectId}` → yearSubjectId
+  // Builds a map: `${yearId}-${subjectId}` → assignment metadata
   _getYearSubjectMap(periodId) {
     const yearPeriods = this.periodRepository.findAllAssignedYears(periodId);
     const map = new Map();
     for (const yp of yearPeriods) {
       const subjects = this.yearRepository.findAllAssignedSubjects(yp.id);
       for (const s of subjects) {
-        map.set(`${yp.yearId}-${s.id}`, s.yearSubjectId);
+        map.set(`${yp.yearId}-${s.id}`, {
+          yearSubjectId: s.yearSubjectId,
+          minimumGrade: s.minimumGrade,
+        });
       }
     }
     return map;
@@ -230,8 +224,8 @@ class GradeService {
           const sKey = String(rawSubjectId);
           if (!allowed.has(sKey) || !Array.isArray(terms)) continue;
 
-          const yearSubjectId = yearSubjectMap.get(`${student.yearId}-${sKey}`);
-          if (!yearSubjectId) continue;
+          const yearSubject = yearSubjectMap.get(`${student.yearId}-${sKey}`);
+          if (!yearSubject) continue;
 
           terms.forEach((termGrades, termIndex) => {
             const term = Number(termIndex + 1);
@@ -255,7 +249,7 @@ class GradeService {
                 value,
                 strategy,
                 student.id,
-                yearSubjectId
+                yearSubject.yearSubjectId
               );
 
               this.subjectRepository.assignGrade(grade);
@@ -263,11 +257,24 @@ class GradeService {
           });
         }
 
-        const newClassStatus = this._getStudentClassStatus(student.id, periodId);
+        const assignedSubjects = [...allowed].map((subjectId) => {
+          const yearSubject = yearSubjectMap.get(
+            `${student.yearId}-${subjectId}`
+          );
+          return {
+            average: this.subjectRepository.getGradeAvgByStudent(
+              yearSubject.yearSubjectId,
+              student.id
+            ),
+            minimumGrade: yearSubject.minimumGrade,
+          };
+        });
+        const newClassStatus =
+          this._getStudentClassStatus(assignedSubjects);
         this.studentRepository.updateClassStatus(
           student.id,
-          newClassStatus.classId,
-          newClassStatus.status
+          student.classId,
+          newClassStatus
         );
       }
 
