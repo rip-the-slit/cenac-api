@@ -216,6 +216,20 @@ describe("Period Endpoint", () => {
         subjects: { 2: [] },
       })
       .expect(200, { loaded: true });
+
+    const suggestions = await supertest(app)
+      .get(`${ROOT}/suggestions`)
+      .expect(200);
+    expect(suggestions.body.students).toEqual([
+      expect.objectContaining({
+        id: students.ana,
+        _class: { id: "A", year: 2 },
+      }),
+      expect.objectContaining({
+        id: students.bruno,
+        _class: { id: "B", year: 2 },
+      }),
+    ]);
   });
 
   test("Returns aggregate statistics in the period model shape", async () => {
@@ -264,6 +278,11 @@ describe("Period Endpoint", () => {
           status: "active",
           _class: null,
         }),
+        expect.objectContaining({
+          id: students.carla,
+          status: "inactive",
+          _class: null,
+        }),
       ])
     );
   });
@@ -271,7 +290,7 @@ describe("Period Endpoint", () => {
   test.each([
     ["year", { year: 2 }, [students.ana, students.diego], 2],
     ["class", { class: "C" }, [students.ana], 1],
-    ["status", { status: "inactive" }, [students.diego], 1],
+    ["status", { status: "inactive" }, [students.carla, students.diego], 2],
     ["page", { page: 2, limit: 2 }, [students.carla, students.diego], 4],
   ])(
     "Filters all-period students by %s after deduplication",

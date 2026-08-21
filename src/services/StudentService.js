@@ -123,61 +123,70 @@ class StudentService {
     };
   }
 
-  getClassSuggestions() {
-    const allYears = this.yearRepository.findAll();
-    const maxYearId = Math.max(...allYears.map((y) => Number(y.id)));
+  _buildClassSuggestions(enrollments, sourcePeriodYearIds) {
+    const availableYears = new Set(sourcePeriodYearIds.map(Number));
+    const students = [];
+    const statusUpdates = [];
 
-    const periods = this.periodRepository.findAll();
-    let sourcePeriod = null;
+    for (const { student, className, yearId } of enrollments) {
+      const nextYearId = Number(yearId) + 1;
+      const hasPassingStatus =
+        student.status === "passed" || student.status === "pending";
+      const isPromoted = hasPassingStatus && availableYears.has(nextYearId);
 
-    for (const period of periods) {
-      const yearPeriod = this.periodRepository.findAllAssignedYears(period.id);
-      let hasStudents = false;
-      for (const yp of yearPeriod) {
-        const classes = this.yearRepository.findAllAssignedClasses(yp.id);
-        for (const cls of classes) {
-          const students = this.studentRepository.findAllByClass(cls.id);
-          if (students.length > 0) {
-            hasStudents = true;
-            break;
-          }
-        }
-        if (hasStudents) break;
-      }
-      if (hasStudents) {
-        sourcePeriod = period;
-        break;
+      statusUpdates.push({
+        ...student,
+        status: isPromoted ? "active" : "inactive",
+      });
+
+      if (isPromoted) {
+        students.push({
+          id: student.id,
+          firstName: student.firstName,
+          lastName: student.lastName,
+          birthDate: student.birthDate,
+          birthPlace: student.birthPlace,
+          _class: { id: className, year: nextYearId },
+        });
       }
     }
 
-    const students = [];
+    return { students, statusUpdates };
+  }
 
-    if (sourcePeriod) {
-      const yearPeriod = this.periodRepository.findAllAssignedYears(
-        sourcePeriod.id
-      );
-      for (const yp of yearPeriod) {
-        const currentYearId = Number(yp.yearId);
+  getClassSuggestions() {
+    const sourcePeriod = this.periodRepository
+      .findAll()
+      .find((period) => period.status === "archived");
+    const sourcePeriodYears = sourcePeriod
+      ? this.periodRepository.findAllAssignedYears(sourcePeriod.id)
+      : [];
+    const sourcePeriodYearIds = sourcePeriodYears.map(({ yearId }) =>
+      Number(yearId)
+    );
+    const enrollments = [];
 
-        if (currentYearId >= maxYearId) continue;
-
-        const nextYearId = currentYearId + 1;
-        const classes = this.yearRepository.findAllAssignedClasses(yp.id);
-
-        for (const cls of classes) {
-          const classStudents = this.studentRepository.findAllByClass(cls.id);
-          for (const student of classStudents) {
-            students.push({
-              id: student.id,
-              firstName: student.firstName,
-              lastName: student.lastName,
-              birthDate: student.birthDate,
-              birthPlace: student.birthPlace,
-              _class: { id: "", year: nextYearId },
-            });
-          }
+    for (const yearPeriod of sourcePeriodYears) {
+      const classes = this.yearRepository.findAllAssignedClasses(yearPeriod.id);
+      for (const assignedClass of classes) {
+        const classStudents =
+          this.studentRepository.findAllByClass(assignedClass.id);
+        for (const student of classStudents) {
+          enrollments.push({
+            student,
+            className: assignedClass.name,
+            yearId: Number(yearPeriod.yearId),
+          });
         }
       }
+    }
+
+    const { students, statusUpdates } = this._buildClassSuggestions(
+      enrollments,
+      sourcePeriodYearIds
+    );
+    for (const student of statusUpdates) {
+      this.studentRepository.update(student.id, student);
     }
 
     return {
@@ -191,7 +200,13 @@ class StudentService {
         _locked: false,
         _class: { id: "", year: null },
       },
-      studentFieldLabels,
+      studentFieldLabels: {
+        id: "Cédula",
+        firstName: "Nombres",
+        lastName: "Apellidos",
+        birthDate: "Fecha de Nacimiento",
+        birthPlace: "Lugar de Nacimiento",
+      }
     };
   }
 }
