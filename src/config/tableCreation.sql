@@ -123,3 +123,12 @@ CREATE TABLE IF NOT EXISTS teacher_subject (
     FOREIGN KEY (teacher_id) REFERENCES teacher(id),
     FOREIGN KEY (year_subject_id) REFERENCES year_subject(id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_grade_year_subject_student
+    ON grade(year_subject_id, student_id);
+CREATE INDEX IF NOT EXISTS idx_year_period_period
+    ON year_period(period_id);
+CREATE INDEX IF NOT EXISTS idx_student_class_class_student
+    ON student_class(class_id, student_id);
+CREATE INDEX IF NOT EXISTS idx_class_year_period
+    ON class(year_period_id);

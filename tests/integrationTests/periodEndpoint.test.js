@@ -275,13 +275,18 @@ describe("Period Endpoint", () => {
         }),
         expect.objectContaining({
           id: students.bruno,
-          status: "active",
+          status: "inactive",
           _class: null,
         }),
         expect.objectContaining({
           id: students.carla,
           status: "inactive",
           _class: null,
+        }),
+        expect.objectContaining({
+          id: students.diego,
+          status: "active",
+          _class: { id: "D", year: 2 },
         }),
       ])
     );
@@ -290,7 +295,7 @@ describe("Period Endpoint", () => {
   test.each([
     ["year", { year: 2 }, [students.ana, students.diego], 2],
     ["class", { class: "C" }, [students.ana], 1],
-    ["status", { status: "inactive" }, [students.carla, students.diego], 2],
+    ["status", { status: "inactive" }, [students.bruno, students.carla], 2],
     ["page", { page: 2, limit: 2 }, [students.carla, students.diego], 4],
   ])(
     "Filters all-period students by %s after deduplication",
@@ -321,7 +326,7 @@ describe("Period Endpoint", () => {
     expect(current.body.studentFieldLabels.status).toBe("Estatus General");
     expect(historical.body.student).toMatchObject({
       id: students.bruno,
-      status: "active",
+      status: "inactive",
       _class: null,
     });
   });

@@ -238,6 +238,21 @@ class StudentRepository {
     );
   }
 
+  updateStatusByPeriod(periodId, status) {
+    const query = this.db.prepare(`
+      UPDATE student
+      SET status = ?
+      WHERE id IN (
+        SELECT student_class.student_id
+        FROM student_class
+        JOIN class ON class.id = student_class.class_id
+        JOIN year_period ON year_period.id = class.year_period_id
+        WHERE year_period.period_id = ?
+      )
+    `);
+    return query.run(status, periodId);
+  }
+
   delete(id) {
     const query = this.db.prepare(`DELETE FROM student WHERE id = ?`);
     return query.run(id);

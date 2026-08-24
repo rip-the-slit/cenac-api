@@ -123,71 +123,48 @@ class StudentService {
     };
   }
 
-  _buildClassSuggestions(enrollments, sourcePeriodYearIds) {
+  _buildClassSuggestions(students, sourcePeriodYearIds) {
     const availableYears = new Set(sourcePeriodYearIds.map(Number));
-    const students = [];
-    const statusUpdates = [];
+    const suggestions = [];
 
-    for (const { student, className, yearId } of enrollments) {
-      const nextYearId = Number(yearId) + 1;
+    for (const student of students) {
+      const nextYearId = Number(student._class?.year) + 1;
       const hasPassingStatus =
         student.status === "passed" || student.status === "pending";
-      const isPromoted = hasPassingStatus && availableYears.has(nextYearId);
-
-      statusUpdates.push({
-        ...student,
-        status: isPromoted ? "active" : "inactive",
-      });
-
-      if (isPromoted) {
-        students.push({
+      if (
+        student._class &&
+        hasPassingStatus &&
+        availableYears.has(nextYearId)
+      ) {
+        suggestions.push({
           id: student.id,
           firstName: student.firstName,
           lastName: student.lastName,
           birthDate: student.birthDate,
           birthPlace: student.birthPlace,
-          _class: { id: className, year: nextYearId },
+          _locked: true,
+          _class: { id: student._class.id, year: nextYearId },
         });
       }
     }
 
-    return { students, statusUpdates };
+    return suggestions;
   }
 
   getClassSuggestions() {
     const sourcePeriod = this.periodRepository
       .findAll()
       .find((period) => period.status === "archived");
-    const sourcePeriodYears = sourcePeriod
-      ? this.periodRepository.findAllAssignedYears(sourcePeriod.id)
-      : [];
-    const sourcePeriodYearIds = sourcePeriodYears.map(({ yearId }) =>
-      Number(yearId)
+    const sourcePeriodStudents = sourcePeriod
+      ? this.getStudentsByPeriod(sourcePeriod.id)
+      : { rows: [], years: [] };
+    const sourcePeriodYearIds = sourcePeriodStudents.years.map(({ id }) =>
+      Number(id)
     );
-    const enrollments = [];
-
-    for (const yearPeriod of sourcePeriodYears) {
-      const classes = this.yearRepository.findAllAssignedClasses(yearPeriod.id);
-      for (const assignedClass of classes) {
-        const classStudents =
-          this.studentRepository.findAllByClass(assignedClass.id);
-        for (const student of classStudents) {
-          enrollments.push({
-            student,
-            className: assignedClass.name,
-            yearId: Number(yearPeriod.yearId),
-          });
-        }
-      }
-    }
-
-    const { students, statusUpdates } = this._buildClassSuggestions(
-      enrollments,
+    const students = this._buildClassSuggestions(
+      sourcePeriodStudents.rows,
       sourcePeriodYearIds
     );
-    for (const student of statusUpdates) {
-      this.studentRepository.update(student.id, student);
-    }
 
     return {
       students,
@@ -206,7 +183,7 @@ class StudentService {
         lastName: "Apellidos",
         birthDate: "Fecha de Nacimiento",
         birthPlace: "Lugar de Nacimiento",
-      }
+      },
     };
   }
 }

@@ -265,7 +265,7 @@ class PeriodService {
             student.lastName,
             student.birthDate,
             student.birthPlace,
-            student.status ?? "active"
+            "active"
           )
         );
       }
@@ -291,6 +291,7 @@ class PeriodService {
     }
 
     this.periodRepository.update(periodId, { ...period, status: "active" });
+    this.studentRepository.updateStatusByPeriod(periodId, "active");
 
     return { loaded: true };
   }
@@ -300,6 +301,7 @@ class PeriodService {
       const period = this.periodRepository.findById(periodId);
       this.isPeriod(period);
 
+      this.studentRepository.updateStatusByPeriod(periodId, "inactive");
       this.periodRepository.update(periodId, { ...period, status: "archived" });
 
       if (!supersede) return;
