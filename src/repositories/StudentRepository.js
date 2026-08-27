@@ -75,40 +75,39 @@ class StudentRepository {
       params.push(periodId);
     }
 
-    const addContainsFilter = (column, value) => {
-      if (!value) return;
-      conditions.push(`LOWER(${column}) LIKE ?`);
-      params.push(`%${value}%`);
+    const addFilter = (value, clause, getParams = (item) => [item]) => {
+      const values = (Array.isArray(value) ? value : [value]).filter(
+        (item) => item !== undefined && item !== null && item !== ""
+      );
+      if (values.length === 0) return;
+
+      conditions.push(
+        `(${values.map(() => clause).join(" OR ")})`
+      );
+      for (const item of values) {
+        params.push(...getParams(item));
+      }
     };
+
+    const addContainsFilter = (column, value) =>
+      addFilter(value, `LOWER(${column}) LIKE ?`, (item) => [`%${item}%`]);
 
     addContainsFilter("id", filters.id);
     addContainsFilter("firstName", filters.firstName);
     addContainsFilter("lastName", filters.lastName);
     addContainsFilter("birthDate", filters.dateOfBirth);
     addContainsFilter("birthPlace", filters.birthPlace);
-
-    if (filters.yearId) {
-      conditions.push("CAST(yearId AS TEXT) = ?");
-      params.push(filters.yearId);
-    }
-
-    if (filters.className) {
-      conditions.push("LOWER(className) = ?");
-      params.push(filters.className);
-    }
-
-    if (filters.status) {
-      conditions.push("LOWER(status) = ?");
-      params.push(filters.status);
-    }
-
-    if (filters.q) {
-      conditions.push(`(
+    addFilter(filters.yearId, "CAST(yearId AS TEXT) = ?");
+    addFilter(filters.className, "LOWER(className) = ?");
+    addFilter(filters.status, "LOWER(status) = ?");
+    addFilter(
+      filters.q,
+      `(
         LOWER(firstName || ' ' || lastName) LIKE ?
         OR LOWER(id) LIKE ?
-      )`);
-      params.push(`%${filters.q}%`, `%${filters.q}%`);
-    }
+      )`,
+      (item) => [`%${item}%`, `%${item}%`]
+    );
 
     return {
       where: conditions.length > 0 ? conditions.join(" AND ") : "1 = 1",

@@ -3,7 +3,11 @@ import PeriodRepository from "../repositories/PeriodRepository.js";
 import YearRepository from "../repositories/YearRepository.js";
 import StudentRepository from "../repositories/StudentRepository.js";
 import { Grade } from "../models/index.js";
-import { normalizeQueryValue, sanitizePagination, toNumberOrNull } from "./queryUtils.js";
+import {
+  normalizeQueryValues,
+  sanitizePagination,
+  toNumberOrNull,
+} from "./queryUtils.js";
 import PeriodService from "./PeriodService.js";
 
 const GRADE_SLOTS_PER_TERM = 5;
@@ -155,10 +159,10 @@ class GradeService {
     }
 
     const sanitizedFilters = {
-      yearId: normalizeQueryValue(filters.yearId),
-      className: normalizeQueryValue(filters.classId),
-      status: normalizeQueryValue(filters.status),
-      q: normalizeQueryValue(filters.q),
+      yearId: normalizeQueryValues(filters.yearId),
+      className: normalizeQueryValues(filters.classId),
+      status: normalizeQueryValues(filters.status),
+      q: normalizeQueryValues(filters.q),
     };
     const pagination = sanitizePagination(filters);
     const { rows: studentRows, recordsAmount } =

@@ -2,7 +2,11 @@ import PeriodRepository from "../repositories/PeriodRepository.js";
 import YearRepository from "../repositories/YearRepository.js";
 import StudentRepository from "../repositories/StudentRepository.js";
 import { Period } from "../models/index.js";
-import { normalizeQueryValue, sanitizePagination } from "./queryUtils.js";
+import {
+  normalizeQueryValue,
+  normalizeQueryValues,
+  sanitizePagination,
+} from "./queryUtils.js";
 import PeriodService from "./PeriodService.js";
 
 class StudentService {
@@ -43,14 +47,14 @@ class StudentService {
     }
 
     const sanitizedFilters = {
-      id: normalizeQueryValue(filters.id),
-      firstName: normalizeQueryValue(filters.firstName),
-      lastName: normalizeQueryValue(filters.lastName),
-      dateOfBirth: normalizeQueryValue(filters.dateOfBirth),
-      birthPlace: normalizeQueryValue(filters.birthPlace),
-      yearId: normalizeQueryValue(filters.year),
-      className: normalizeQueryValue(filters.classId ?? filters.className),
-      status: normalizeQueryValue(filters.status),
+      id: normalizeQueryValues(filters.id),
+      firstName: normalizeQueryValues(filters.firstName),
+      lastName: normalizeQueryValues(filters.lastName),
+      dateOfBirth: normalizeQueryValues(filters.dateOfBirth),
+      birthPlace: normalizeQueryValues(filters.birthPlace),
+      yearId: normalizeQueryValues(filters.year),
+      className: normalizeQueryValues(filters.classId ?? filters.className),
+      status: normalizeQueryValues(filters.status),
     };
     const pagination = sanitizePagination(filters);
     const { rows: rawRows, recordsAmount } =

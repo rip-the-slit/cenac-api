@@ -152,6 +152,12 @@ describe("Grade Endpoint", () => {
     ["class", { classId: "B" }, [students.bruno], 1],
     ["status", { status: "pending" }, [students.bruno, students.carla], 2],
     ["name", { q: "ana alonso" }, [students.ana], 1],
+    [
+      "multiple names",
+      { q: "ana alonso OR bruno benitez OR nobody" },
+      [students.ana, students.bruno],
+      2,
+    ],
     ["page", { page: 1, limit: 2 }, [students.ana, students.bruno], 3],
   ])("filters by %s", async (_filter, query, expectedIds, recordsAmount) => {
     const res = await supertest(app)

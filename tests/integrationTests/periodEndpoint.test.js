@@ -130,6 +130,12 @@ describe("Period Endpoint", () => {
   test.each([
     ["id", { id: "10000001" }, [students.ana], 1],
     ["first name", { firstName: "ana" }, [students.ana], 1],
+    [
+      "multiple first names",
+      { firstName: "ana OR carla OR nobody" },
+      [students.ana, students.carla],
+      2,
+    ],
     ["last name", { lastName: "benitez" }, [students.bruno], 1],
     ["birth date", { dateOfBirth: "2010-09" }, [students.carla], 1],
     ["birth place", { birthPlace: "maracaibo" }, [students.bruno], 1],

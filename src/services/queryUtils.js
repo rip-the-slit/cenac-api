@@ -5,6 +5,19 @@ export function normalizeQueryValue(value) {
   return normalized || null;
 }
 
+export function normalizeQueryValues(value) {
+  const values = Array.isArray(value) ? value : [value];
+
+  return values
+    .flatMap((item) =>
+      item === undefined || item === null
+        ? []
+        : String(item).split(" OR ")
+    )
+    .map(normalizeQueryValue)
+    .filter(Boolean);
+}
+
 export function sanitizePagination({ page, limit } = {}) {
   if (limit === undefined || limit === null || limit === "") return null;
 
