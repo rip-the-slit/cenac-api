@@ -4,6 +4,7 @@ import periodRoutes from "./periodRoutes.js";
 import gradeRoutes from "./gradeRoutes.js";
 import yearRoutes from "./yearRoutes.js";
 import subjectRoutes from "./subjectRoutes.js";
+import reportRoutes from "./reportRoutes.js";
 import getRelativeFilePath from "../config/getRelativeFilePath.js";
 
 const router = Router();
@@ -13,5 +14,6 @@ router.use("/periods", periodRoutes);
 router.use("/grades", gradeRoutes);
 router.use("/years", yearRoutes);
 router.use("/subjects", subjectRoutes);
+router.use("/reports", reportRoutes);
 
 export default router;
