@@ -5,8 +5,11 @@
     "test": "NODE_ENV=\"test\" NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" jest --watch"
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "docx": "^9.7.1",
-    "express": "^4.22.2",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.0",
     "open": "^8.4.2",
     "sql.js": "^1.14.1"
   },

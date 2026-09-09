@@ -1,14 +1,8 @@
-CREATE TABLE IF NOT EXISTS user_level (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS user (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     password TEXT NOT NULL,
-    user_level_id TEXT,
-    FOREIGN KEY (user_level_id) REFERENCES user_level(id)
+    user_level TEXT NOT NULL CHECK(user_level IN ("Administrador", "Coordinador", "Profesor"))
 );
 
 CREATE TABLE IF NOT EXISTS year (

@@ -7,9 +7,8 @@ class UserRepository {
   }
 
   findById(id) {
-    const query = this.db.prepare(`SELECT user.id, user.name, user.password, user_level.name as "userLevel" 
-                                  FROM user JOIN user_level ON user.user_level_id = user_level.id 
-                                  WHERE user.id = ?`);
+    const query = this.db.prepare(`SELECT id, name, password, user_level as "userLevel"
+                                  FROM user WHERE id = ?`);
     const result = query.get(id);
     
     if (!result) return null;
@@ -17,30 +16,33 @@ class UserRepository {
   }
 
   findAll() {
-    const query = this.db.prepare(`SELECT user.id, user.name, user_level.name as "userLevel" FROM user 
-                                  JOIN user_level ON user.user_level_id = user_level.id`);
+    const query = this.db.prepare(
+      `SELECT id, name, user_level as "userLevel" FROM user`
+    );
     const results = query.all();
     
     return results.map(row => new User(row.id, row.name, row.userLevel));
   }
 
   findAllUserLevels() {
-    const query = this.db.prepare(`SELECT name FROM user_level`);
-    const results = query.all();
-
-    return results.map(row => row.name);
+    return ["Administrador", "Coordinador", "Profesor"];
   }
 
   create(user) {
-    const query = this.db.prepare(`INSERT INTO user (id, name, user_level_id, password) 
-                                  VALUES (?, ?, (SELECT user_level.id FROM user_level WHERE user_level.name = ?), ?)`);
-    return query.run(user.id, user.name, user.userLevel, user.password);
+    const query = this.db.prepare(
+      `INSERT INTO user (name, user_level, password) VALUES (?, ?, ?)`
+    );
+    return query.run(
+      user.name,
+      user.userLevel,
+      user.password
+    )
   }
 
   update(id, userData) {
     const query = this.db.prepare(`UPDATE user 
                                   SET name = ?, 
-                                  user_level_id = (SELECT user_level.id FROM user_level WHERE user_level.name = ?), 
+                                  user_level = ?, 
                                   password = ? 
                                   WHERE id = ?`);
     return query.run(userData.name, userData.userLevel, userData.password, id);
