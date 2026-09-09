@@ -12,7 +12,7 @@ class PeriodController {
       const data = this.periodService.getPeriodList();
       res.json(data);
     } catch (e) {
-      res.status(500).json({ error: e.message });
+      res.status(e.status || 500).json({ error: e.message });
     }
   }
 
@@ -21,7 +21,7 @@ class PeriodController {
       const data = this.periodService.getPeriodStats(req.params.id);
       res.json(data);
     } catch (e) {
-      res.status(404).json({ error: e.message });
+      res.status(e.status || 500).json({ error: e.message });
     }
   }
 
@@ -30,7 +30,7 @@ class PeriodController {
       const data = this.studentService.getClassesByYear(req.params.id);
       res.json(data);
     } catch (e) {
-      res.status(404).json({ error: e.message });
+      res.status(e.status || 500).json({ error: e.message });
     }
   }
 
@@ -63,7 +63,7 @@ class PeriodController {
       });
       res.json(data);
     } catch (e) {
-      res.status(404).json({ error: e.message });
+      res.status(e.status || 500).json({ error: e.message });
     }
   }
 
@@ -72,7 +72,7 @@ class PeriodController {
       const data = this.studentService.getStudentById(req.params.id, req.params.studentId);
       res.json(data);
     } catch (e) {
-      res.status(404).json({ error: e.message });
+      res.status(e.status || 500).json({ error: e.message });
     }
   }
 
@@ -85,7 +85,7 @@ class PeriodController {
       const data = this.periodService.addPeriod(period);
       res.status(201).json(data);
     } catch (e) {
-      res.status(500).json({ error: e.message });
+      res.status(e.status || 500).json({ error: e.message });
     }
   }
 
@@ -98,7 +98,7 @@ class PeriodController {
       const data = this.periodService.loadPeriodData(req.params.id, students, subjects);
       res.json(data);
     } catch (e) {
-      res.status(404).json({ error: e.message });
+      res.status(e.status || 500).json({ error: e.message });
     }
   }
 
@@ -107,7 +107,7 @@ class PeriodController {
       const data = this.studentService.getClassSuggestions();
       res.json(data);
     } catch (e) {
-      res.status(500).json({ error: e.message });
+      res.status(e.status || 500).json({ error: e.message });
     }
   }
 
@@ -120,7 +120,7 @@ class PeriodController {
       const data = this.periodService.archivePeriod(req.params.id, supersede);
       res.json(data);
     } catch (e) {
-      res.status(500).json({ error: e.message });
+      res.status(e.status || 500).json({ error: e.message });
     }
   }
 }

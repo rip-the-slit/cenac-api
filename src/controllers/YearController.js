@@ -10,7 +10,7 @@ class YearController {
       const data = this.yearService.getYears();
       res.json(data);
     } catch (e) {
-      res.status(500).json({ error: e.message });
+      res.status(e.status || 500).json({ error: e.message });
     }
   }
 }

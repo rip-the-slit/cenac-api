@@ -12,7 +12,7 @@ class ReportController {
     try {
       res.json(this.reportService.getReportOptionData());
     } catch (e) {
-      res.status(500).json({ error: e.message });
+      res.status(e.status || 500).json({ error: e.message });
     }
   }
 
@@ -35,7 +35,7 @@ class ReportController {
       );
       res.send(buffer);
     } catch (e) {
-      res.status(404).json({ error: e.message });
+      res.status(e.status || 500).json({ error: e.message });
     }
   }
 }

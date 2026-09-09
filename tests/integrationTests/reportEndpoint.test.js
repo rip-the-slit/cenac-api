@@ -1,5 +1,6 @@
 import supertest from "supertest";
 import app from "../../src/app";
+const agent = supertest.agent(app);
 
 const ROOT = "/api/reports";
 const PERIOD_ID = "2110";
@@ -17,7 +18,12 @@ const students = {
 };
 
 beforeAll(async () => {
-  await supertest(app)
+  await agent
+    .post("/api/users/login")
+    .send({ id: 1, password: "1234" })
+    .expect(200);
+
+  await agent
     .post("/api/periods")
     .send({
       startYear: Number(PERIOD_ID),
@@ -26,7 +32,7 @@ beforeAll(async () => {
     })
     .expect(201);
 
-  await supertest(app)
+  await agent
     .post(`/api/periods/${PERIOD_ID}/load`)
     .send({
       students: [
@@ -59,7 +65,7 @@ beforeAll(async () => {
     })
     .expect(200, { loaded: true });
 
-  await supertest(app)
+  await agent
     .post("/api/grades/load")
     .send({
       periodId: PERIOD_ID,
@@ -73,7 +79,7 @@ beforeAll(async () => {
 
 describe("Report Endpoint", () => {
   test("returns report option data", async () => {
-    const res = await supertest(app).get(ROOT).expect(200);
+    const res = await agent.get(ROOT).expect(200);
 
     expect(res.body.reportTypes).toEqual([
       expect.objectContaining({
@@ -85,7 +91,7 @@ describe("Report Endpoint", () => {
   });
 
   test("generates a Word grades report for multiple student ids", async () => {
-    const res = await supertest(app)
+    const res = await agent
       .get(`${ROOT}/grades`)
       .query({
         periodId: PERIOD_ID,

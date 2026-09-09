@@ -1,18 +1,12 @@
 -- Periods
-INSERT INTO period (id, start_year, end_year) VALUES 
-('2025', 2025, 2026)
-ON CONFLICT (id) DO NOTHING;
-
--- User Levels
-INSERT INTO user_level (id, name) VALUES 
-(1, 'Admin'), 
-(2, 'Coordinador')
-ON CONFLICT (id) DO NOTHING;
+-- INSERT INTO period (id, start_year, end_year) VALUES 
+-- ('2025', 2025, 2026)
+-- ON CONFLICT (id) DO NOTHING;
 
 -- Users
-INSERT INTO user (id, name, password, user_level_id) VALUES 
-(1, 'Admin', '1234', 1), 
-(2, 'Valeria', '1234', 2)
+INSERT INTO user (id, name, password, user_level) VALUES 
+(1, 'Admin', '$2a$12$/723YyQcveGBEysGE98ffe6KlFXIw28hyZAUQk2ksmd0.F545C8Du', 'Administrador'), 
+(2, 'Valeria', '$2a$12$/723YyQcveGBEysGE98ffe6KlFXIw28hyZAUQk2ksmd0.F545C8Du', 'Coordinador')
 ON CONFLICT (id) DO NOTHING;
 
 -- Years

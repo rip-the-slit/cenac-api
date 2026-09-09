@@ -19,7 +19,7 @@ class GradeController {
       });
       res.json(data);
     } catch (e) {
-      res.status(404).json({ error: e.message });
+      res.status(e.status || 500).json({ error: e.message });
     }
   }
 
@@ -31,7 +31,7 @@ class GradeController {
       const data = this.gradeService.loadGrades(periodId, grades);
       res.json(data);
     } catch (e) {
-      res.status(404).json({ error: e.message });
+      res.status(e.status || 500).json({ error: e.message });
     }
   }
 }

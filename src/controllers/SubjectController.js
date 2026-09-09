@@ -10,7 +10,7 @@ class SubjectController {
       const data = this.subjectService.getSubjects();
       res.json(data);
     } catch (e) {
-      res.status(500).json({ error: e.message });
+      res.status(e.status || 500).json({ error: e.message });
     }
   }
 }

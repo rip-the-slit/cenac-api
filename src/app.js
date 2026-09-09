@@ -1,8 +1,10 @@
 import express from "express";
-import router from "./routes/index.js";
+import { configDotenv } from "dotenv";
 import open from "open";
+import router from "./routes/index.js";
 import getRelativeFilePath from "./config/getRelativeFilePath.js";
 
+configDotenv({quiet: true})
 const isTesting = process.env.NODE_ENV === "test";
 const PORT = 3000;
 const app = express();
@@ -25,7 +27,7 @@ app.use((err, req, res, next) => {
 
 if (!isTesting) {
   app.listen(PORT, console.log);
-  open(`http://localhost:${PORT}/`);
+  // open(`http://localhost:${PORT}/`);
 }
 
 export default app;

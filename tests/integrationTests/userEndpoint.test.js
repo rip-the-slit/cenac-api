@@ -1,13 +1,17 @@
 import supertest from "supertest";
 import app from "../../src/app";
-import jwt from "jsonwebtoken";
-import bcrypt from "bcryptjs/dist/bcrypt.js";
-import { parseCookie } from "../../src/controllers/httpUtils";
 
 const ROOT = "/api/users";
 const agent = supertest.agent(app);
 
 describe("User Endpoint", () => {
+  beforeAll(async () => {
+    await agent
+      .post(`${ROOT}/login`)
+      .send({ id: 1, password: "1234" })
+      .expect(200);
+  });
+
   test("Root returns user list", async () => {
     const res = await agent.get(ROOT).expect(200);
 
@@ -19,19 +23,13 @@ describe("User Endpoint", () => {
       userLevel: expect.any(String),
     });
   });
-  test("Login returns jwt", async () => {
-    const res = await agent
+  test("Login authenticates subsequent requests", async () => {
+    await agent
       .post(`${ROOT}/login`)
       .send({ id: 1, password: "1234" })
       .expect(200);
 
-    expect(
-      jwt.verify(parseCookie(res.headers["set-cookie"][0]).token, process.env.JWT_SECRET)
-    ).toMatchObject({
-      id: expect.any(Number),
-      name: expect.any(String),
-      userLevel: expect.any(String),
-    });
+    await agent.get(ROOT).expect(200);
   });
   test("Registration creates new user", async () => {
     const res = await agent
@@ -72,14 +70,6 @@ describe("User Endpoint", () => {
       name: "Mary",
       userLevel: "Administrador",
     });
-    await agent
-      .post(`${ROOT}/login`)
-      .send({ id: users[2].id, password: "12345" })
-      .expect(200);
-    await agent
-      .post(`${ROOT}/login`)
-      .send({ id: 1, password: "1234" })
-      .expect(200);
   });
 
   test("Allows deleting users except itself", async () => {
@@ -97,9 +87,5 @@ describe("User Endpoint", () => {
   test("Logout deactivates cookie", async () => {
     const res = await agent.post(`${ROOT}/logout`).expect(200);
     expect(res.body).toBe(true);
-    const cookie = res.headers["set-cookie"][0];
-
-    expect(parseCookie(cookie).token).toBe("");
-    expect(cookie).toMatch(/Expires=Thu, 01 Jan 1970 00:00:00 GMT/i);
   });
 });

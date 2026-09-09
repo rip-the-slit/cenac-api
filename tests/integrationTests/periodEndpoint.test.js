@@ -1,5 +1,6 @@
 import supertest from "supertest";
 import app from "../../src/app";
+const agent = supertest.agent(app);
 
 const ROOT = "/api/periods";
 const PERIOD_ID = "2025";
@@ -38,9 +39,16 @@ const periodStudents = [
   },
 ];
 
+beforeAll(async () => {
+  await agent
+    .post("/api/users/login")
+    .send({ id: 1, password: "1234" })
+    .expect(200);
+});
+
 describe("Period Endpoint", () => {
   test("Root returns empty object", async () => {
-    const res = await supertest(app).get(ROOT).expect(200);
+    const res = await agent.get(ROOT).expect(200);
 
     expect(res.body).toBeInstanceOf(Object);
     expect(res.body).toHaveLength(0);
@@ -52,9 +60,9 @@ describe("Period Endpoint", () => {
       endYear: 2026,
       openingDate: "2025-10-10",
     };
-    await supertest(app).post(ROOT).send(newPeriod).expect(201);
+    await agent.post(ROOT).send(newPeriod).expect(201);
 
-    const res = await supertest(app).get(ROOT).expect(200);
+    const res = await agent.get(ROOT).expect(200);
     expect(res.body[0]).toMatchObject({
       status: "new",
       startYear: 2025,
@@ -64,7 +72,7 @@ describe("Period Endpoint", () => {
   });
 
   test("Loads the period students", async () => {
-    await supertest(app)
+    await agent
       .post(`${ROOT}/${PERIOD_ID}/load`)
       .send({
         students: periodStudents,
@@ -74,7 +82,7 @@ describe("Period Endpoint", () => {
   });
 
   test("Returns the students in the period", async () => {
-    const res = await supertest(app)
+    const res = await agent
       .get(`${ROOT}/${PERIOD_ID}/students`)
       .expect(200);
 
@@ -151,7 +159,7 @@ describe("Period Endpoint", () => {
   ])(
     "Filters students by %s",
     async (_filter, query, expectedIds, recordsAmount) => {
-      const res = await supertest(app)
+      const res = await agent
         .get(`${ROOT}/${PERIOD_ID}/students`)
         .query(query)
         .expect(200);
@@ -164,7 +172,7 @@ describe("Period Endpoint", () => {
   );
 
   test("Returns enrollment data for an individual period student", async () => {
-    const res = await supertest(app)
+    const res = await agent
       .get(`${ROOT}/${PERIOD_ID}/students/${students.ana}`)
       .expect(200);
 
@@ -185,14 +193,14 @@ describe("Period Endpoint", () => {
     };
     expect(
       (
-        await supertest(app)
+        await agent
           .post(`${ROOT}/${PERIOD_ID}/archive`)
           .send({ supersede: true })
           .expect(200)
       ).body
     ).toMatchObject(newPeriod);
 
-    const res = await supertest(app).get(ROOT).expect(200);
+    const res = await agent.get(ROOT).expect(200);
     expect(res.body[0]).toMatchObject(newPeriod)
     expect(res.body[1]).toMatchObject({
       status: "archived",
@@ -201,7 +209,7 @@ describe("Period Endpoint", () => {
       openingDate: "2025-10-10",
     });
 
-    await supertest(app)
+    await agent
       .post(`${ROOT}/2026/load`)
       .send({
         students: [
@@ -223,7 +231,7 @@ describe("Period Endpoint", () => {
       })
       .expect(200, { loaded: true });
 
-    const suggestions = await supertest(app)
+    const suggestions = await agent
       .get(`${ROOT}/suggestions`)
       .expect(200);
     expect(suggestions.body.students).toEqual([
@@ -239,7 +247,7 @@ describe("Period Endpoint", () => {
   });
 
   test("Returns aggregate statistics in the period model shape", async () => {
-    const res = await supertest(app).get(`${ROOT}/all`).expect(200);
+    const res = await agent.get(`${ROOT}/all`).expect(200);
 
     expect(res.body).toEqual({
       id: "all",
@@ -256,7 +264,7 @@ describe("Period Endpoint", () => {
   });
 
   test("Returns unique students with class data from the loaded period", async () => {
-    const res = await supertest(app)
+    const res = await agent
       .get(`${ROOT}/all/students`)
       .expect(200);
 
@@ -306,7 +314,7 @@ describe("Period Endpoint", () => {
   ])(
     "Filters all-period students by %s after deduplication",
     async (_filter, query, expectedIds, recordsAmount) => {
-      const res = await supertest(app)
+      const res = await agent
         .get(`${ROOT}/all/students`)
         .query(query)
         .expect(200);
@@ -317,10 +325,10 @@ describe("Period Endpoint", () => {
   );
 
   test("Returns current class data for individual all-period students", async () => {
-    const current = await supertest(app)
+    const current = await agent
       .get(`${ROOT}/all/students/${students.ana}`)
       .expect(200);
-    const historical = await supertest(app)
+    const historical = await agent
       .get(`${ROOT}/all/students/${students.bruno}`)
       .expect(200);
 
@@ -338,7 +346,7 @@ describe("Period Endpoint", () => {
   });
 
   test("Returns the largest class list found for each year", async () => {
-    const res = await supertest(app)
+    const res = await agent
       .get(`${ROOT}/all/classes`)
       .expect(200);
 

@@ -5,11 +5,13 @@ import gradeRoutes from "./gradeRoutes.js";
 import yearRoutes from "./yearRoutes.js";
 import subjectRoutes from "./subjectRoutes.js";
 import reportRoutes from "./reportRoutes.js";
-import getRelativeFilePath from "../config/getRelativeFilePath.js";
+import AuthMiddleware from "../middleware/AuthMiddleware.js";
 
 const router = Router();
 
+router.use((req, res, next) => AuthMiddleware.parseCookies(req, res, next));
 router.use("/users", userRoutes);
+router.use((req, res, next) => AuthMiddleware.verifyToken(req, res, next));
 router.use("/periods", periodRoutes);
 router.use("/grades", gradeRoutes);
 router.use("/years", yearRoutes);

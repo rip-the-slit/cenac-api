@@ -1,5 +1,6 @@
 import supertest from "supertest";
 import app from "../../src/app";
+const agent = supertest.agent(app);
 
 const ROOT = "/api/grades";
 const PERIOD_ID = "2090";
@@ -12,7 +13,12 @@ const students = {
 };
 
 beforeAll(async () => {
-  await supertest(app)
+  await agent
+    .post("/api/users/login")
+    .send({ id: 1, password: "1234" })
+    .expect(200);
+
+  await agent
     .post("/api/periods")
     .send({
       startYear: Number(PERIOD_ID),
@@ -21,7 +27,7 @@ beforeAll(async () => {
     })
     .expect(201);
 
-  await supertest(app)
+  await agent
     .post(`/api/periods/${PERIOD_ID}/load`)
     .send({
       students: [
@@ -62,7 +68,7 @@ describe("Grade Endpoint", () => {
       { id: students.bruno, subjects: { 1: [[8, 6]] } },
     ];
 
-    const res = await supertest(app)
+    const res = await agent
       .post(`${ROOT}/load`)
       .send({ periodId: PERIOD_ID, grades })
       .expect(200);
@@ -71,7 +77,7 @@ describe("Grade Endpoint", () => {
   });
 
   test("returns the loaded grades", async () => {
-    const res = await supertest(app)
+    const res = await agent
       .get(ROOT)
       .query({ periodId: PERIOD_ID })
       .expect(200);
@@ -160,7 +166,7 @@ describe("Grade Endpoint", () => {
     ],
     ["page", { page: 1, limit: 2 }, [students.ana, students.bruno], 3],
   ])("filters by %s", async (_filter, query, expectedIds, recordsAmount) => {
-    const res = await supertest(app)
+    const res = await agent
       .get(ROOT)
       .query({ periodId: PERIOD_ID, ...query })
       .expect(200);
@@ -172,11 +178,11 @@ describe("Grade Endpoint", () => {
   });
 
   test("returns separate grade rows for each period when periodId is all", async () => {
-    await supertest(app)
+    await agent
       .post(`/api/periods/${PERIOD_ID}/archive`)
       .send({ supersede: true })
       .expect(200);
-    await supertest(app)
+    await agent
       .post(`/api/periods/${NEXT_PERIOD_ID}/load`)
       .send({
         students: [
@@ -192,7 +198,7 @@ describe("Grade Endpoint", () => {
         subjects: { 2: [3] },
       })
       .expect(200, { loaded: true });
-    await supertest(app)
+    await agent
       .post(`${ROOT}/load`)
       .send({
         periodId: NEXT_PERIOD_ID,
@@ -200,7 +206,7 @@ describe("Grade Endpoint", () => {
       })
       .expect(200, { loaded: 1, skipped: 0 });
 
-    const res = await supertest(app)
+    const res = await agent
       .get(ROOT)
       .query({ periodId: "all" })
       .expect(200);
@@ -232,7 +238,7 @@ describe("Grade Endpoint", () => {
       );
     }
 
-    const filtered = await supertest(app)
+    const filtered = await agent
       .get(ROOT)
       .query({ periodId: "all", q: "ana alonso" })
       .expect(200);
@@ -242,7 +248,7 @@ describe("Grade Endpoint", () => {
       Number(NEXT_PERIOD_ID),
     ]);
 
-    const paged = await supertest(app)
+    const paged = await agent
       .get(ROOT)
       .query({ periodId: "all", page: 1, limit: 2 })
       .expect(200);

@@ -1,6 +1,4 @@
 import UserService from "../services/UserService.js";
-import jwt from "jsonwebtoken";
-import { parseCookie } from "./httpUtils.js";
 
 class UserController {
   constructor(userService) {
@@ -62,11 +60,7 @@ class UserController {
 
   delete(req, res) {
     try {
-      const token = parseCookie(req.headers.cookie).token;
-      if (!token) return res.status(401).json({ error: "No autenticado." });
-      const activeUser = jwt.verify(token, process.env.JWT_SECRET);
-
-      res.json(this.userService.delete(req.params.id, activeUser.id));
+      res.json(this.userService.delete(req.params.id, req.user.id));
     } catch (e) {
       res.status(e.status || 500).json({ error: e.message });
     }

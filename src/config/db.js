@@ -2,6 +2,7 @@ import initSqlJs from "sql.js";
 import fs from "fs";
 import path from "path";
 import getRelativeFilePath from "./getRelativeFilePath.js";
+import seedPeriodData from "./seedPeriodData.js";
 
 const isTesting = process.env.NODE_ENV === "test"
 const dbPath = path.resolve("students.db");
@@ -160,5 +161,9 @@ const initData = fs.readFileSync(initDataFilePath, "utf-8");
 
 db.exec(tableCreation);
 db.exec(initData);
+
+if (!isTesting) {
+  seedPeriodData(db);
+}
 
 export default db;
