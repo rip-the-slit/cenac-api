@@ -18,16 +18,17 @@ class UserService {
 
   async login(id, password) {
     const user = this.userRepository.findById(id);
-    const isMatch = user && await bcrypt.compare(password, user.password);
+    const isMatch = user && (await bcrypt.compare(password, user.password));
 
     if (!user || !isMatch) throw new Error("Credenciales inválidas.");
 
+    const activeUser = new User(user.id, user.name, user.userLevel);
+
     return {
-      token: jwt.sign(
-        { ...new User(user.id, user.name, user.userLevel) },
-        process.env.JWT_SECRET,
-        { expiresIn: "1h" }
-      ),
+      activeUser: { ...activeUser },
+      token: jwt.sign({ ...activeUser }, process.env.JWT_SECRET, {
+        expiresIn: "1h",
+      }),
     };
   }
 
@@ -40,7 +41,7 @@ class UserService {
 
   async update(id, userData) {
     const currentUser = this.userRepository.findById(id);
-    const userLevels = this.userRepository.findAllUserLevels()
+    const userLevels = this.userRepository.findAllUserLevels();
     if (!currentUser) throw new Error("Usuario no encontrado.");
 
     const userLevel = userLevels.includes(userData.userLevel)

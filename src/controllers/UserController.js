@@ -29,6 +29,12 @@ class UserController {
         maxAge: 60 * 60000,
         path: "/",
       });
+      res.cookie("activeUser", data.activeUser, {
+        secure: process.env.NODE_ENV !== "test",
+        sameSite: "strict",
+        maxAge: 60 * 60000,
+        path: "/",
+      });
       res.json(true);
     } catch (e) {
       res.status(e.status || 500).json({ error: e.message });
@@ -39,7 +45,9 @@ class UserController {
     try {
       const { name, password, userLevel } = req.body;
       if (!name || !password || !userLevel) {
-        return res.status(400).json({ error: "Todos los campos son requeridos." });
+        return res
+          .status(400)
+          .json({ error: "Todos los campos son requeridos." });
       }
 
       res.json(await this.userService.register({ name, password, userLevel }));
@@ -52,7 +60,13 @@ class UserController {
     try {
       const { name, password, userLevel } = req.body;
 
-      res.json(await this.userService.update(req.params.id, { name, password, userLevel }));
+      res.json(
+        await this.userService.update(req.params.id, {
+          name,
+          password,
+          userLevel,
+        })
+      );
     } catch (e) {
       res.status(e.status || 500).json({ error: e.message });
     }
@@ -70,6 +84,11 @@ class UserController {
     try {
       res.clearCookie("token", {
         httpOnly: true,
+        secure: process.env.NODE_ENV !== "test",
+        sameSite: "strict",
+        path: "/",
+      });
+      res.clearCookie("activeUser", {
         secure: process.env.NODE_ENV !== "test",
         sameSite: "strict",
         path: "/",
