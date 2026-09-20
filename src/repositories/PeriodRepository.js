@@ -8,8 +8,8 @@ class PeriodRepository {
 
   findById(id) {
     const query = this.db.prepare(`
-      SELECT id, status, start_year as "startYear", end_year as "endYear", opening_date as "openingDate", closing_date as "closingDate" 
-      FROM period 
+      SELECT id, status, start_year as "startYear", end_year as "endYear", opening_date as "openingDate", user_id as "userId"
+      FROM period
       WHERE id = ?
     `);
 
@@ -22,13 +22,13 @@ class PeriodRepository {
       result.startYear,
       result.endYear,
       result.openingDate,
-      result.closingDate
+      result.userId
     );
   }
 
   findAll() {
     const query = this.db.prepare(`
-      SELECT id, status, start_year as "startYear", end_year as "endYear", opening_date as "openingDate", closing_date as "closingDate" 
+      SELECT id, status, start_year as "startYear", end_year as "endYear", opening_date as "openingDate", user_id as "userId"
       FROM period ORDER BY start_year DESC
     `);
 
@@ -42,14 +42,14 @@ class PeriodRepository {
           row.startYear,
           row.endYear,
           row.openingDate,
-          row.closingDate
+          row.userId
         )
     );
   }
 
   create(period) {
     const query = this.db.prepare(`
-      INSERT INTO period (id, status, start_year, end_year, opening_date, closing_date) 
+      INSERT INTO period (id, status, start_year, end_year, opening_date, user_id)
       VALUES (?, ?, ?, ?, ?, ?)
     `);
     return query.run(
@@ -58,14 +58,14 @@ class PeriodRepository {
       period.startYear,
       period.endYear,
       period.openingDate,
-      period.closingDate
+      period.userId
     );
   }
 
   update(id, periodData) {
     const query = this.db.prepare(`
-      UPDATE period 
-      SET status = ?, start_year = ?, end_year = ?, opening_date = ?, closing_date = ? 
+      UPDATE period
+      SET status = ?, start_year = ?, end_year = ?, opening_date = ?, user_id = ?
       WHERE id = ?
     `);
     return query.run(
@@ -73,7 +73,7 @@ class PeriodRepository {
       periodData.startYear,
       periodData.endYear,
       periodData.openingDate,
-      periodData.closingDate,
+      periodData.userId,
       id
     );
   }
@@ -120,9 +120,9 @@ class PeriodRepository {
 
   findAllAssignedYears(id) {
     const query = this.db
-      .prepare(`SELECT year_period.id, year.id as "yearId", year.name as "yearName", 
-              year_period.period_id as "periodId" FROM year_period 
-              JOIN year ON year_period.year_id = year.id 
+      .prepare(`SELECT year_period.id, year.id as "yearId", year.name as "yearName", year.abbr as "yearAbbr",
+              year_period.period_id as "periodId" FROM year_period
+              JOIN year ON year_period.year_id = year.id
               WHERE period_id = ? ORDER BY year.id ASC`);
     const results = query.all(id);
     return results;

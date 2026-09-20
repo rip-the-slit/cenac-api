@@ -56,14 +56,16 @@ class GradeService {
   }
 
   _getStudentsWithMeta(periodId) {
-    return this.studentRepository.findAllByPeriod(periodId).rows.map((student) => ({
-      id: student.id,
-      firstName: student.firstName,
-      lastName: student.lastName,
-      status: student.status,
-      classId: student.classDatabaseId,
-      yearId: student.yearId,
-    }));
+    return this.studentRepository
+      .findAllByPeriod(periodId, { includeGuardians: false })
+      .rows.map((student) => ({
+        id: student.id,
+        firstName: student.firstName,
+        lastName: student.lastName,
+        status: student.status,
+        classId: student.classDatabaseId,
+        yearId: student.yearId,
+      }));
   }
 
   // Builds a map: `${yearId}-${subjectId}` → assignment metadata
@@ -169,6 +171,7 @@ class GradeService {
       this.studentRepository.findAllByPeriod(periodId, {
         filters: sanitizedFilters,
         pagination,
+        includeGuardians: false,
       });
     const gradeRows = this.subjectRepository.findAllGradesByStudents(
       periodId,

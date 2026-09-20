@@ -7,28 +7,28 @@ class YearRepository {
   }
 
   findById(id) {
-    const query = this.db.prepare(`SELECT id, name FROM year WHERE id = ?`);
+    const query = this.db.prepare(`SELECT id, name, abbr FROM year WHERE id = ?`);
     const result = query.get(id);
 
     if (!result) return null;
-    return new Year(result.id, result.name);
+    return new Year(result.id, result.name, result.abbr);
   }
 
   findAll() {
-    const query = this.db.prepare(`SELECT id, name FROM year`);
+    const query = this.db.prepare(`SELECT id, name, abbr FROM year`);
     const results = query.all();
 
-    return results.map((row) => new Year(row.id, row.name));
+    return results.map((row) => new Year(row.id, row.name, row.abbr));
   }
 
   create(year) {
-    const query = this.db.prepare(`INSERT INTO year (id, name) VALUES (?, ?)`);
-    return query.run(year.id, year.name);
+    const query = this.db.prepare(`INSERT INTO year (id, name, abbr) VALUES (?, ?, ?)`);
+    return query.run(year.id, year.name, year.abbr);
   }
 
   update(id, yearData) {
-    const query = this.db.prepare(`UPDATE year SET name = ? WHERE id = ?`);
-    return query.run(yearData.name, id);
+    const query = this.db.prepare(`UPDATE year SET name = ?, abbr = ? WHERE id = ?`);
+    return query.run(yearData.name, yearData.abbr, id);
   }
 
   delete(id) {
@@ -38,14 +38,12 @@ class YearRepository {
 
   assignClass(classData) {
     const query = this.db.prepare(
-      `INSERT INTO class (name, year_period_id, shift, location, capacity) VALUES (?, ?, ?, ?, ?) RETURNING *`
+      `INSERT INTO class (name, student_count, year_period_id) VALUES (?, ?, ?)  RETURNING *`
     );
     return query.get(
       classData.name,
-      classData.yearPeriodId,
-      classData.shift,
-      classData.location,
-      classData.capacity
+      classData.studentCount,
+      classData.yearPeriodId
     );
   }
 
@@ -59,9 +57,7 @@ class YearRepository {
         new Class(
           row.id,
           row.name,
-          row.shift,
-          row.location,
-          row.capacity,
+          row.student_count,
           row.yearPeriodId
         )
     );
@@ -86,9 +82,7 @@ class YearRepository {
       const assignedClass = new Class(
         row.id,
         row.name,
-        row.shift,
-        row.location,
-        row.capacity,
+        row.student_count,
         row.yearPeriodId
       );
       assignedClass.yearId = row.yearId;
@@ -106,9 +100,7 @@ class YearRepository {
     return new Class(
       row.id,
       row.name,
-      row.shift,
-      row.location,
-      row.capacity,
+      row.student_count,
       row.yearPeriodId
     );
   }

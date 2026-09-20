@@ -21,20 +21,6 @@ const BIRTH_PLACES = [
   "Puerto La Cruz, Anzoátegui", "San Cristóbal, Táchira",
 ];
 
-const TEACHERS = [
-  ["V-11234567", "Maritza", "Gómez", "Licenciada en Educación, mención Castellano"],
-  ["V-12345678", "José", "Márquez", "Licenciado en Educación, mención Inglés"],
-  ["V-13456789", "Carmen", "Rivas", "Licenciada en Matemática"],
-  ["V-14567890", "Luis", "Salcedo", "Profesor de Educación Física"],
-  ["V-15678901", "Elena", "Pinto", "Licenciada en Artes"],
-  ["V-16789012", "Ricardo", "Peña", "Licenciado en Biología"],
-  ["V-17890123", "Ana", "Moreno", "Licenciada en Física"],
-  ["V-18901234", "David", "Silva", "Licenciado en Química"],
-  ["V-19012345", "Rosa", "Parra", "Licenciada en Geografía e Historia"],
-  ["V-20123456", "Pedro", "Bastidas", "Licenciado en Ciencias Sociales"],
-  ["V-21234567", "Yelitza", "Ruiz", "Orientadora"],
-  ["V-22345678", "Orlando", "León", "Licenciado en Educación"],
-];
 
 const SUBJECTS_BY_YEAR = {
   1: [1, 2, 3, 4, 5, 6, 11, 12, 13, 14],
@@ -70,38 +56,27 @@ export default function seedPeriodData(db) {
 
   db.transaction(() => {
     db.prepare(`
-      INSERT INTO period (id, status, start_year, end_year, opening_date, closing_date)
+      INSERT INTO period (id, status, start_year, end_year, opening_date, user_id)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(periodId, "active", 2025, 2026, "2025-09-15", "2026-07-31");
-
-    for (const [id, firstName, lastName, degree] of TEACHERS) {
-      db.prepare(`
-        INSERT INTO teacher (id, first_name, last_name, degree)
-        VALUES (?, ?, ?, ?)
-      `).run(id, firstName, lastName, degree);
-    }
+    `).run(periodId, "active", 2025, 2026, "2025-09-15", 1);
 
     for (let yearId = 1; yearId <= 5; yearId++) {
       const yearPeriodId = db.prepare(`
         INSERT INTO year_period (year_id, period_id) VALUES (?, ?)
       `).run(yearId, periodId).lastInsertRowid;
-      const yearSubjectIds = SUBJECTS_BY_YEAR[yearId].map((subjectId, index) => {
+      const yearSubjectIds = SUBJECTS_BY_YEAR[yearId].map((subjectId) => {
         const yearSubjectId = db.prepare(`
           INSERT INTO year_subject (year_period_id, subject_id) VALUES (?, ?)
         `).run(yearPeriodId, subjectId).lastInsertRowid;
-        db.prepare(`
-          INSERT INTO teacher_subject (teacher_id, year_subject_id) VALUES (?, ?)
-        `).run(TEACHERS[index % TEACHERS.length][0], yearSubjectId);
         return yearSubjectId;
       });
 
       for (let section = 1; section <= 2; section++) {
         const classId = db.prepare(`
-          INSERT INTO class (name, year_period_id, shift, location, capacity)
-          VALUES (?, ?, ?, ?, ?)
+          INSERT INTO class (name, student_count, year_period_id)
+          VALUES (?, ?, ?)
         `).run(
-          `Sección ${section === 1 ? "A" : "B"}`, yearPeriodId,
-          section === 1 ? "Mañana" : "Tarde", "Sede Principal, Caracas", 30
+          `Sección ${section === 1 ? "A" : "B"}`, 25, yearPeriodId
         ).lastInsertRowid;
 
         for (let position = 1; position <= 25; position++) {

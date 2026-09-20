@@ -20,7 +20,7 @@ class ReportController {
     try {
       const { periodId, q, terms } = req.query;
       if (!periodId) {
-        return res.status(400).json({ error: "periodId es requerido" });
+        return res.status(400).json({ error: "El identificador del periodo es requerido" });
       }
 
       const buffer = await this.reportService.generateGradesReport(

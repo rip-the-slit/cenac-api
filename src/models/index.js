@@ -8,9 +8,10 @@ export class User {
 }
 
 export class Year {
-  constructor(id, name) {
+  constructor(id, name, abbr = null) {
     this.id = id;
     this.name = name;
+    this.abbr = abbr;
   }
 }
 
@@ -24,22 +25,25 @@ export class Subject {
   }
 }
 
-export class Teacher {
-  constructor(id, firstName, lastName, degree) {
-    this.id = id;
-    this.firstName = firstName;
-    this.lastName = lastName;
-    this.degree = degree;
-  }
-}
-
 export class Guardian {
-  constructor(id, firstName, lastName, birthDate, legalRole) {
+  constructor(
+    id,
+    firstName,
+    lastName,
+    birthDate,
+    legalRole,
+    phone = null,
+    address = null,
+    assignedStudents = []
+  ) {
     this.id = id;
     this.firstName = firstName;
     this.lastName = lastName;
     this.birthDate = birthDate;
     this.legalRole = legalRole;
+    this.phone = phone;
+    this.address = address;
+    this.assignedStudents = assignedStudents;
   }
 }
 
@@ -51,7 +55,8 @@ export class Student {
     birthDate,
     birthPlace,
     status,
-    classId = null
+    classId = null,
+    assignedGuardians = []
   ) {
     this.id = id;
     this.firstName = firstName;
@@ -60,17 +65,18 @@ export class Student {
     this.birthPlace = birthPlace;
     this.status = status;
     this.classId = classId;
+    this.assignedGuardians = assignedGuardians;
   }
 }
 
 export class Period {
-  constructor(id, status, startYear, endYear, openingDate, closingDate) {
+  constructor(id, status, startYear, endYear, openingDate, userId = null) {
     this.id = id;
     this.status = status;
     this.startYear = startYear;
     this.endYear = endYear;
     this.openingDate = openingDate;
-    this.closingDate = closingDate;
+    this.userId = userId;
   }
 }
 
@@ -82,12 +88,10 @@ export class PeriodStats {
 }
 
 export class Class {
-  constructor(id, name, shift, location, capacity, yearPeriodId) {
+  constructor(id, name, studentCount, yearPeriodId) {
     this.id = id;
     this.name = name;
-    this.shift = shift;
-    this.location = location;
-    this.capacity = capacity;
+    this.studentCount = studentCount;
     this.yearPeriodId = yearPeriodId;
   }
 }

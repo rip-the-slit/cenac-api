@@ -44,6 +44,11 @@ class PeriodController {
         birthPlace,
         year,
         status,
+        q,
+        guardianId,
+        guardianFirstName,
+        guardianLastName,
+        guardianQ,
         page,
         limit,
       } = req.query;
@@ -57,6 +62,11 @@ class PeriodController {
         birthPlace,
         year,
         status,
+        q,
+        guardianId,
+        guardianFirstName,
+        guardianLastName,
+        guardianQ,
         classId,
         page,
         limit,
@@ -69,7 +79,10 @@ class PeriodController {
 
   getStudentById(req, res) {
     try {
-      const data = this.studentService.getStudentById(req.params.id, req.params.studentId);
+      const data = this.studentService.getStudentById(
+        req.params.id,
+        req.params.studentId
+      );
       res.json(data);
     } catch (e) {
       res.status(e.status || 500).json({ error: e.message });
@@ -78,11 +91,11 @@ class PeriodController {
 
   addPeriod(req, res) {
     try {
-      const period = req.body
+      const period = req.body;
       if (typeof period !== "object") {
-        return res.status(400).json({ error: "body debe ser un objeto" });
+        return res.status(400).json({ error: "El cuerpo de la solicitud debe ser un objeto" });
       }
-      const data = this.periodService.addPeriod(period);
+      const data = this.periodService.addPeriod(period, req.user.id);
       res.status(201).json(data);
     } catch (e) {
       res.status(e.status || 500).json({ error: e.message });
@@ -93,9 +106,15 @@ class PeriodController {
     try {
       const { students, subjects } = req.body;
       if (!Array.isArray(students) || typeof subjects !== "object") {
-        return res.status(400).json({ error: "students y subjects son requeridos" });
+        return res
+          .status(400)
+          .json({ error: "Los estudiantes y las materias son requeridos" });
       }
-      const data = this.periodService.loadPeriodData(req.params.id, students, subjects);
+      const data = this.periodService.loadPeriodData(
+        req.params.id,
+        students,
+        subjects
+      );
       res.json(data);
     } catch (e) {
       res.status(e.status || 500).json({ error: e.message });
@@ -115,9 +134,13 @@ class PeriodController {
     try {
       const { supersede } = req.body;
       if (typeof supersede !== "boolean") {
-        return res.status(400).json({ error: "supersede debe ser un booleano" });
+        return res.status(400).json({ error: "El campo supersede debe ser booleano" });
       }
-      const data = this.periodService.archivePeriod(req.params.id, supersede);
+      const data = this.periodService.archivePeriod(
+        req.params.id,
+        supersede,
+        req.user.id
+      );
       res.json(data);
     } catch (e) {
       res.status(e.status || 500).json({ error: e.message });

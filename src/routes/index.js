@@ -5,6 +5,7 @@ import gradeRoutes from "./gradeRoutes.js";
 import yearRoutes from "./yearRoutes.js";
 import subjectRoutes from "./subjectRoutes.js";
 import reportRoutes from "./reportRoutes.js";
+import guardianRoutes from "./guardianRoutes.js";
 import AuthMiddleware from "../middleware/AuthMiddleware.js";
 
 const router = Router();
@@ -12,10 +13,18 @@ const router = Router();
 router.use((req, res, next) => AuthMiddleware.parseCookies(req, res, next));
 router.use("/users", userRoutes);
 router.use((req, res, next) => AuthMiddleware.verifyToken(req, res, next));
+router.use((req, res, next) =>
+  AuthMiddleware.checkRole("Administrador", "Coordinador", "Profesor")(
+    req,
+    res,
+    next
+  )
+);
 router.use("/periods", periodRoutes);
 router.use("/grades", gradeRoutes);
 router.use("/years", yearRoutes);
 router.use("/subjects", subjectRoutes);
 router.use("/reports", reportRoutes);
+router.use("/guardians", guardianRoutes);
 
 export default router;

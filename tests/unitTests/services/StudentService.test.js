@@ -1,6 +1,50 @@
 import StudentService from "../../../src/services/StudentService";
 
 describe("StudentService", () => {
+  describe("_parseStudentRows", () => {
+    test("groups guardians by student enrollment and removes duplicate joins", () => {
+      const enrollment = {
+        id: "student-1",
+        firstName: "Ana",
+        lastName: "Pérez",
+        periodId: 10,
+        className: "A",
+        yearId: 1,
+      };
+      const guardian = {
+        assignedGuardianId: "guardian-1",
+        assignedGuardianFirstName: "María",
+        assignedGuardianLastName: "Pérez",
+        assignedGuardianLegalRole: "Madre",
+      };
+
+      const result = StudentService._parseStudentRows([
+        { ...enrollment, ...guardian },
+        { ...enrollment, ...guardian },
+        {
+          ...enrollment,
+          periodId: 11,
+          assignedGuardianId: "guardian-2",
+          assignedGuardianFirstName: "José",
+          assignedGuardianLastName: "Pérez",
+          assignedGuardianLegalRole: "Padre",
+        },
+      ]);
+
+      expect(result).toHaveLength(2);
+      expect(result[0].assignedGuardians).toEqual([
+        expect.objectContaining({ id: "guardian-1", firstName: "María" }),
+      ]);
+      expect(result[1]).toMatchObject({
+        id: "student-1",
+        periodId: 11,
+        assignedGuardians: [
+          expect.objectContaining({ id: "guardian-2", firstName: "José" }),
+        ],
+      });
+    });
+  });
+
   describe("_buildClassSuggestions", () => {
     test("promotes eligible students to the same class in the next available year", () => {
       const enrollments = [

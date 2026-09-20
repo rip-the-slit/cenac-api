@@ -81,14 +81,9 @@ class StudentRepository {
       );
       if (values.length === 0) return;
 
-      conditions.push(
-        `(${values.map(() => clause).join(" OR ")})`
-      );
-      for (const item of values) {
-        params.push(...getParams(item));
-      }
+      conditions.push(`(${values.map(() => clause).join(" OR ")})`);
+      for (const item of values) params.push(...getParams(item));
     };
-
     const addContainsFilter = (column, value) =>
       addFilter(value, `LOWER(${column}) LIKE ?`, (item) => [`%${item}%`]);
 
@@ -109,6 +104,57 @@ class StudentRepository {
       (item) => [`%${item}%`, `%${item}%`]
     );
 
+    const guardianConditions = [
+      "student_guardian_filter.student_id = student_rows.id",
+    ];
+    const guardianParams = [];
+    const addGuardianFilter = (
+      value,
+      clause,
+      getParams = (item) => [item]
+    ) => {
+      const values = (Array.isArray(value) ? value : [value]).filter(
+        (item) => item !== undefined && item !== null && item !== ""
+      );
+      if (values.length === 0) return;
+
+      guardianConditions.push(`(${values.map(() => clause).join(" OR ")})`);
+      for (const item of values) guardianParams.push(...getParams(item));
+    };
+    const addGuardianContainsFilter = (column, value) =>
+      addGuardianFilter(value, `LOWER(${column}) LIKE ?`, (item) => [
+        `%${item}%`,
+      ]);
+
+    addGuardianContainsFilter("guardian_filter.id", filters.guardianId);
+    addGuardianContainsFilter(
+      "guardian_filter.first_name",
+      filters.guardianFirstName
+    );
+    addGuardianContainsFilter(
+      "guardian_filter.last_name",
+      filters.guardianLastName
+    );
+    addGuardianFilter(
+      filters.guardianQ,
+      `(
+        LOWER(guardian_filter.first_name || ' ' || guardian_filter.last_name) LIKE ?
+        OR LOWER(guardian_filter.id) LIKE ?
+      )`,
+      (item) => [`%${item}%`, `%${item}%`]
+    );
+
+    if (guardianConditions.length > 1) {
+      conditions.push(`EXISTS (
+        SELECT 1
+        FROM student_guardian student_guardian_filter
+        JOIN guardian guardian_filter
+          ON guardian_filter.id = student_guardian_filter.guardian_id
+        WHERE ${guardianConditions.join(" AND ")}
+      )`);
+      params.push(...guardianParams);
+    }
+
     return {
       where: conditions.length > 0 ? conditions.join(" AND ") : "1 = 1",
       params,
@@ -117,7 +163,12 @@ class StudentRepository {
 
   findAllByPeriod(
     periodId,
-    { filters = {}, pagination = null, deduplicate = false } = {}
+    {
+      filters = {},
+      pagination = null,
+      deduplicate = false,
+      includeGuardians = true,
+    } = {}
   ) {
     const shouldDeduplicate = periodId === "all" && deduplicate;
     const { where, params } = this._getPeriodStudentWhere(periodId, filters);
@@ -125,7 +176,6 @@ class StudentRepository {
     const rowParams = pagination
       ? [...params, pagination.limit, pagination.offset]
       : params;
-
     const activePeriodValue = (column) => shouldDeduplicate
       ? `CASE WHEN period.status = 'active' THEN ${column} END`
       : column;
@@ -133,41 +183,6 @@ class StudentRepository {
       ? "student.status"
       : "student_class.status";
     const rankedCondition = shouldDeduplicate ? "enrollmentRank = 1 AND" : "";
-
-    const studentRowsQuery = `
-      WITH student_rows AS (
-        SELECT
-          student.id,
-          student.first_name as "firstName",
-          student.last_name as "lastName",
-          student.birth_date as "birthDate",
-          student.birth_place as "birthPlace",
-          ${status} as "status",
-          ${activePeriodValue("class.id")} as "classDatabaseId",
-          ${activePeriodValue("class.name")} as "className",
-          ${activePeriodValue("year_period.id")} as "yearPeriodId",
-          ${activePeriodValue("year_period.year_id")} as "yearId",
-          ${activePeriodValue("year.name")} as "yearName",
-          period.id as "periodId",
-          period.status as "periodStatus",
-          period.start_year as "periodStartYear",
-          ROW_NUMBER() OVER (
-            PARTITION BY student.id
-            ORDER BY CASE WHEN period.status = 'active' THEN 0 ELSE 1 END,
-              period.start_year DESC
-          ) as "enrollmentRank"
-      FROM student
-      JOIN student_class ON student_class.student_id = student.id
-      JOIN class ON class.id = student_class.class_id
-      JOIN year_period ON year_period.id = class.year_period_id
-      JOIN year ON year.id = year_period.year_id
-      JOIN period ON period.id = year_period.period_id
-      )
-    `;
-    const filteredRowsQuery = `
-      FROM student_rows
-      WHERE ${rankedCondition} ${where}
-    `;
     const studentColumns = `
       id,
       firstName,
@@ -177,6 +192,7 @@ class StudentRepository {
       status,
       classDatabaseId,
       className,
+      classStudentCount,
       yearPeriodId,
       yearId,
       yearName,
@@ -189,18 +205,83 @@ class StudentRepository {
         firstName COLLATE NOCASE ASC,
         id ASC
     `;
-
+    const studentRowsQuery = `
+      WITH student_rows AS (
+        SELECT
+          student.id,
+          student.first_name as "firstName",
+          student.last_name as "lastName",
+          student.birth_date as "birthDate",
+          student.birth_place as "birthPlace",
+          ${status} as "status",
+          ${activePeriodValue("class.id")} as "classDatabaseId",
+          ${activePeriodValue("class.name")} as "className",
+          ${activePeriodValue("class.student_count")} as "classStudentCount",
+          ${activePeriodValue("year_period.id")} as "yearPeriodId",
+          ${activePeriodValue("year_period.year_id")} as "yearId",
+          ${activePeriodValue("year.name")} as "yearName",
+          period.id as "periodId",
+          period.status as "periodStatus",
+          period.start_year as "periodStartYear",
+          ROW_NUMBER() OVER (
+            PARTITION BY student.id
+            ORDER BY CASE WHEN period.status = 'active' THEN 0 ELSE 1 END,
+              period.start_year DESC
+          ) as "enrollmentRank"
+        FROM student
+        JOIN student_class ON student_class.student_id = student.id
+        JOIN class ON class.id = student_class.class_id
+        JOIN year_period ON year_period.id = class.year_period_id
+        JOIN year ON year.id = year_period.year_id
+        JOIN period ON period.id = year_period.period_id
+      ),
+      filtered_students AS (
+        SELECT ${studentColumns}
+        FROM student_rows
+        WHERE ${rankedCondition} ${where}
+      )
+    `;
     const countRow = this.db.prepare(`
       ${studentRowsQuery}
       SELECT COUNT(*) as "recordsAmount"
-      ${filteredRowsQuery}
+      FROM filtered_students
     `).get(...params);
+    const relationshipColumns = includeGuardians
+      ? `,
+        guardian.id as "assignedGuardianId",
+        guardian.first_name as "assignedGuardianFirstName",
+        guardian.last_name as "assignedGuardianLastName",
+        guardian.birth_date as "assignedGuardianBirthDate",
+        guardian.legal_role as "assignedGuardianLegalRole",
+        guardian.phone as "assignedGuardianPhone",
+        guardian.address as "assignedGuardianAddress"`
+      : "";
+    const relationshipJoins = includeGuardians
+      ? `
+        LEFT JOIN student_guardian
+          ON student_guardian.student_id = paged_students.id
+        LEFT JOIN guardian ON guardian.id = student_guardian.guardian_id`
+      : "";
+    const relationshipOrder = includeGuardians
+      ? `,
+        guardian.last_name COLLATE NOCASE ASC,
+        guardian.first_name COLLATE NOCASE ASC,
+        guardian.id ASC`
+      : "";
     const rows = this.db.prepare(`
-      ${studentRowsQuery}
-      SELECT ${studentColumns}
-      ${filteredRowsQuery}
-      ${orderQuery}
-      ${paginationSql}
+      ${studentRowsQuery},
+      paged_students AS (
+        SELECT *
+        FROM filtered_students
+        ${orderQuery}
+        ${paginationSql}
+      )
+      SELECT paged_students.*${relationshipColumns}
+      FROM paged_students
+      ${relationshipJoins}
+      ORDER BY paged_students.lastName COLLATE NOCASE ASC,
+        paged_students.firstName COLLATE NOCASE ASC,
+        paged_students.id ASC${relationshipOrder}
     `).all(...rowParams);
 
     return { rows, recordsAmount: Number(countRow.recordsAmount) };
@@ -267,7 +348,7 @@ class StudentRepository {
 
   findAllAssignedGuardians(studentId) {
     const query = this.db
-      .prepare(`SELECT guardian.id, guardian.first_name as "firstName", guardian.last_name as "lastName", guardian.birth_date as "birthDate", guardian.legal_role as "legalRole"
+      .prepare(`SELECT guardian.id, guardian.first_name as "firstName", guardian.last_name as "lastName", guardian.birth_date as "birthDate", guardian.legal_role as "legalRole", guardian.phone, guardian.address
                                   FROM guardian JOIN student_guardian ON guardian.id = student_guardian.guardian_id
                                   WHERE student_guardian.student_id = ?`);
     const results = query.all(studentId);
@@ -278,7 +359,9 @@ class StudentRepository {
           row.firstName,
           row.lastName,
           row.birthDate,
-          row.legalRole
+          row.legalRole,
+          row.phone,
+          row.address
         )
     );
   }
@@ -302,7 +385,7 @@ class StudentRepository {
 
   findAllAssignedClasses(studentId) {
     const query = this.db
-      .prepare(`SELECT class.id, class.name, class.shift, class.location, class.capacity, class.year_period_id as "yearPeriodId"
+      .prepare(`SELECT class.id, class.name, class.student_count as "studentCount", class.year_period_id as "yearPeriodId"
                                   FROM class JOIN student_class ON class.id = student_class.class_id
                                   WHERE student_class.student_id = ?`);
     const results = query.all(studentId);
@@ -311,9 +394,7 @@ class StudentRepository {
         new Class(
           row.id,
           row.name,
-          row.shift,
-          row.location,
-          row.capacity,
+          row.studentCount,
           row.yearPeriodId
         )
     );
@@ -321,7 +402,7 @@ class StudentRepository {
 
   findAssignedClassByPeriod(studentId, periodId) {
     const query = this.db.prepare(`
-      SELECT class.id, class.name, class.shift, class.location, class.capacity,
+      SELECT class.id, class.name, class.student_count as "studentCount",
         class.year_period_id as "yearPeriodId"
       FROM student_class
       JOIN class ON class.id = student_class.class_id
@@ -333,9 +414,7 @@ class StudentRepository {
     return new Class(
       result.id,
       result.name,
-      result.shift,
-      result.location,
-      result.capacity,
+      result.studentCount,
       result.yearPeriodId
     );
   }

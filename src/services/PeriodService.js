@@ -38,7 +38,7 @@ class PeriodService {
       : this.periodRepository
           .findAllAssignedYears(periodId)
           .map((y) => ({
-            ...new Year(y.yearId, y.yearName),
+            ...new Year(y.yearId, y.yearName, y.yearAbbr),
             yearPeriodId: y.id,
           }));
     const classes =
@@ -195,7 +195,7 @@ class PeriodService {
     return openingYear === period.startYear;
   }
 
-  addPeriod(period) {
+  addPeriod(period, userId) {
     const periodList = this.periodRepository.findAll();
 
     if (!this.isPeriodListAddable(periodList)) {
@@ -214,7 +214,7 @@ class PeriodService {
       period.startYear,
       period.endYear,
       period.openingDate,
-      null
+      userId
     );
     this.periodRepository.create(newPeriod);
     return newPeriod;
@@ -255,6 +255,18 @@ class PeriodService {
       yearPeriodMap.set(Number(year.id), yearPeriod);
     }
 
+    const classCounts = new Map();
+    for (const student of studentsToLoad) {
+      const yearId = Number(student._class?.year);
+      const className = student._class?.id;
+      const yp = yearPeriodMap.get(yearId);
+      if (!yp || !className) continue;
+
+      const key = `${yp.id}-${className}`;
+      if (!classCounts.has(key)) classCounts.set(key, new Set());
+      classCounts.get(key).add(student.id);
+    }
+
     for (const student of studentsToLoad) {
       const existingStudent = this.studentRepository.findById(student.id);
       if (!existingStudent) {
@@ -278,7 +290,12 @@ class PeriodService {
       let existingClass = classMap.get(`${yp.id}-${className}`);
       if (!existingClass) {
         existingClass = this.yearRepository.assignClass(
-          new Class(null, className, null, null, null, yp.id)
+          new Class(
+            null,
+            className,
+            classCounts.get(`${yp.id}-${className}`)?.size ?? 0,
+            yp.id
+          )
         );
         classMap.set(`${yp.id}-${className}`, existingClass);
       }
@@ -296,7 +313,7 @@ class PeriodService {
     return { loaded: true };
   }
 
-  archivePeriod(periodId, supersede) {
+  archivePeriod(periodId, supersede, userId) {
     return this.periodRepository.db.transaction(() => {
       const period = this.periodRepository.findById(periodId);
       this.isPeriod(period);
@@ -312,7 +329,7 @@ class PeriodService {
         period.endYear,
         period.endYear + 1,
         period.openingDate,
-        null
+        userId
       );
 
       const periodList = this.periodRepository.findAll();

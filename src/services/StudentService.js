@@ -8,18 +8,21 @@ import {
   sanitizePagination,
 } from "./queryUtils.js";
 import PeriodService from "./PeriodService.js";
+import GuardianService from "./GuardianService.js";
 
 class StudentService {
   constructor(
     periodRepository,
     yearRepository,
     studentRepository,
-    periodService
+    periodService,
+    guardianService
   ) {
     this.periodRepository = periodRepository;
     this.yearRepository = yearRepository;
     this.studentRepository = studentRepository;
     this.periodService = periodService;
+    this.guardianService = guardianService;
   }
 
   isPeriod(period) {
@@ -40,7 +43,55 @@ class StudentService {
     return this.periodService.getPeriodFilterData(periodId).classesByYear;
   }
 
-  getStudentsByPeriod(periodId, filters = {}) {
+  _parseStudentRows(rawRows) {
+    const students = new Map();
+    const guardianIds = new Map();
+
+    for (const row of rawRows) {
+      const key = JSON.stringify([row.id, row.periodId]);
+      if (!students.has(key)) {
+        students.set(key, {
+          id: row.id,
+          firstName: row.firstName,
+          lastName: row.lastName,
+          birthDate: row.birthDate,
+          birthPlace: row.birthPlace,
+          status: row.status,
+          classDatabaseId: row.classDatabaseId,
+          className: row.className,
+          classStudentCount: row.classStudentCount,
+          yearPeriodId: row.yearPeriodId,
+          yearId: row.yearId,
+          yearName: row.yearName,
+          periodId: row.periodId,
+          periodStatus: row.periodStatus,
+          periodStartYear: row.periodStartYear,
+          assignedGuardians: [],
+        });
+        guardianIds.set(key, new Set());
+      }
+
+      if (
+        row.assignedGuardianId &&
+        !guardianIds.get(key).has(row.assignedGuardianId)
+      ) {
+        students.get(key).assignedGuardians.push({
+          id: row.assignedGuardianId,
+          firstName: row.assignedGuardianFirstName,
+          lastName: row.assignedGuardianLastName,
+          birthDate: row.assignedGuardianBirthDate,
+          legalRole: row.assignedGuardianLegalRole,
+          phone: row.assignedGuardianPhone,
+          address: row.assignedGuardianAddress,
+        });
+        guardianIds.get(key).add(row.assignedGuardianId);
+      }
+    }
+
+    return Array.from(students.values());
+  }
+
+  getStudentsByPeriod(periodId, filters = {}, includeGuardians = true) {
     if (periodId !== "all") {
       const period = this.periodRepository.findById(periodId);
       this.isPeriod(period);
@@ -55,6 +106,11 @@ class StudentService {
       yearId: normalizeQueryValues(filters.year),
       className: normalizeQueryValues(filters.classId ?? filters.className),
       status: normalizeQueryValues(filters.status),
+      q: normalizeQueryValues(filters.q),
+      guardianId: normalizeQueryValues(filters.guardianId),
+      guardianFirstName: normalizeQueryValues(filters.guardianFirstName),
+      guardianLastName: normalizeQueryValues(filters.guardianLastName),
+      guardianQ: normalizeQueryValues(filters.guardianQ),
     };
     const pagination = sanitizePagination(filters);
     const { rows: rawRows, recordsAmount } =
@@ -62,9 +118,10 @@ class StudentService {
         filters: sanitizedFilters,
         pagination,
         deduplicate: periodId === "all",
+        includeGuardians,
       });
 
-    const rows = rawRows.map((student) => ({
+    const rows = this._parseStudentRows(rawRows).map((student) => ({
       id: student.id,
       firstName: student.firstName,
       lastName: student.lastName,
@@ -74,6 +131,7 @@ class StudentService {
       _class: student.className
         ? { id: student.className, year: student.yearId }
         : null,
+      assignedGuardians: student.assignedGuardians,
     }));
     const filterData = this.periodService.getPeriodFilterData(periodId, {
       useGeneralStatuses: periodId === "all",
@@ -91,6 +149,7 @@ class StudentService {
         birthPlace: "Lugar de Nacimiento",
         class: periodId === "all" ? "Sección actual" : "Sección",
         status: periodId === "all" ? "Estatus General" : "Estatus del Periodo",
+        assignedGuardians: "Representantes Asignados",
       },
     };
   }
@@ -107,9 +166,15 @@ class StudentService {
     const { rows } = this.studentRepository.findAllByPeriod(periodId, {
       filters: { id: normalizeQueryValue(studentId) },
       deduplicate: periodId === "all",
+      includeGuardians: true,
     });
-    const enrollment = rows.find((row) => row.id === studentId);
-    if (enrollment) student.status = enrollment.status;
+    const enrollment = this._parseStudentRows(rows).find(
+      (row) => row.id === studentId
+    );
+    if (enrollment) {
+      student.status = enrollment.status;
+      student.assignedGuardians = enrollment.assignedGuardians;
+    }
     student._class = enrollment?.className
       ? { id: enrollment.className, year: enrollment.yearId }
       : null;
@@ -123,6 +188,7 @@ class StudentService {
         birthDate: "Fecha de Nacimiento",
         birthPlace: "Lugar de Nacimiento",
         status: periodId === "all" ? "Estatus General" : "Estatus del Periodo",
+        assignedGuardians: "Representantes Asignados",
       },
     };
   }
@@ -146,7 +212,6 @@ class StudentService {
           lastName: student.lastName,
           birthDate: student.birthDate,
           birthPlace: student.birthPlace,
-          _locked: true,
           _class: { id: student._class.id, year: nextYearId },
         });
       }
@@ -181,6 +246,15 @@ class StudentService {
         _locked: false,
         _class: { id: "", year: null },
       },
+      guardianClass: {
+        id: "",
+        firstName: "",
+        lastName: "",
+        birthDate: "",
+        legalRole: "",
+        phone: "",
+        address: "",
+      },
       studentFieldLabels: {
         id: "Cédula",
         firstName: "Nombres",
@@ -188,6 +262,7 @@ class StudentService {
         birthDate: "Fecha de Nacimiento",
         birthPlace: "Lugar de Nacimiento",
       },
+      guardianFieldLabels: this.guardianService._getFieldLabels(),
     };
   }
 }
@@ -196,5 +271,6 @@ export default new StudentService(
   PeriodRepository,
   YearRepository,
   StudentRepository,
-  PeriodService
+  PeriodService,
+  GuardianService
 );

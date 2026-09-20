@@ -1,25 +1,25 @@
 -- Periods
--- INSERT INTO period (id, start_year, end_year) VALUES 
+-- INSERT INTO period (id, start_year, end_year) VALUES
 -- ('2025', 2025, 2026)
 -- ON CONFLICT (id) DO NOTHING;
 
 -- Users
-INSERT INTO user (id, name, password, user_level) VALUES 
-(1, 'Admin', '$2a$12$/723YyQcveGBEysGE98ffe6KlFXIw28hyZAUQk2ksmd0.F545C8Du', 'Administrador'), 
+INSERT INTO user (id, name, password, user_level) VALUES
+(1, 'Admin', '$2a$12$/723YyQcveGBEysGE98ffe6KlFXIw28hyZAUQk2ksmd0.F545C8Du', 'Administrador'),
 (2, 'Valeria', '$2a$12$/723YyQcveGBEysGE98ffe6KlFXIw28hyZAUQk2ksmd0.F545C8Du', 'Coordinador')
 ON CONFLICT (id) DO NOTHING;
 
 -- Years
-INSERT INTO year (id, name) VALUES 
-(1, '1er Año'), 
-(2, '2do Año'), 
-(3, '3er Año'), 
-(4, '4to Año'), 
-(5, '5to Año')
+INSERT INTO year (id, name, abbr) VALUES
+(1, '1er Año', '1er'),
+(2, '2do Año', '2do'),
+(3, '3er Año', '3er'),
+(4, '4to Año', '4to'),
+(5, '5to Año', '5to')
 ON CONFLICT (id) DO NOTHING;
 
 -- Subjects
-INSERT INTO subject (id, name, abbr, minimum_grade) VALUES 
+INSERT INTO subject (id, name, abbr, minimum_grade) VALUES
 (1, 'Castellano', 'CA', 10),
 (2, 'Inglés y otras Lenguas Extranjeras', 'ILE', 10),
 (3, 'Matemáticas', 'MA', 10),
@@ -32,6 +32,6 @@ INSERT INTO subject (id, name, abbr, minimum_grade) VALUES
 (10, 'Ciencias de la Tierra', 'CT', 10),
 (11, 'Geografía, Historia y Ciudadanía', 'GHC', 10),
 (12, 'Formación para la Soberanía Nacional', 'FSN', 10),
-(13, 'Orientación y Convivencia', 'OC', 10), 
+(13, 'Orientación y Convivencia', 'OC', 10),
 (14, 'Participación en Grupos de Creación , recreación y Producción', 'PG', 10)
 ON CONFLICT (id) DO NOTHING;

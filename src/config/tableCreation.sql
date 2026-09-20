@@ -7,7 +7,8 @@ CREATE TABLE IF NOT EXISTS user (
 
 CREATE TABLE IF NOT EXISTS year (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL
+    name TEXT NOT NULL,
+    abbr TEXT
 );
 
 CREATE TABLE IF NOT EXISTS subject (
@@ -15,13 +16,6 @@ CREATE TABLE IF NOT EXISTS subject (
     name TEXT NOT NULL,
     abbr TEXT,
     minimum_grade REAL
-);
-
-CREATE TABLE IF NOT EXISTS teacher (
-    id TEXT PRIMARY KEY,
-    first_name TEXT NOT NULL,
-    last_name TEXT NOT NULL,
-    degree TEXT
 );
 
 CREATE TABLE IF NOT EXISTS guardian (
@@ -49,7 +43,8 @@ CREATE TABLE IF NOT EXISTS period (
     start_year INTEGER,
     end_year INTEGER,
     opening_date DATE,
-    closing_date DATE
+    user_id INTEGER,
+    FOREIGN KEY (user_id) REFERENCES user(id)
 );
 
 CREATE TABLE IF NOT EXISTS year_period (
@@ -73,10 +68,8 @@ CREATE TABLE IF NOT EXISTS year_subject (
 CREATE TABLE IF NOT EXISTS class (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT,
+    student_count INTEGER,
     year_period_id INTEGER,
-    shift TEXT,
-    location TEXT,
-    capacity INTEGER,
     UNIQUE (name, year_period_id),
     FOREIGN KEY (year_period_id) REFERENCES year_period(id)
 );
@@ -110,12 +103,13 @@ CREATE TABLE IF NOT EXISTS student_class (
     FOREIGN KEY (class_id) REFERENCES class(id)
 );
 
-CREATE TABLE IF NOT EXISTS teacher_subject (
-    teacher_id TEXT,
-    year_subject_id INTEGER,
-    PRIMARY KEY (teacher_id, year_subject_id),
-    FOREIGN KEY (teacher_id) REFERENCES teacher(id),
-    FOREIGN KEY (year_subject_id) REFERENCES year_subject(id)
+CREATE TABLE IF NOT EXISTS pending_subject (
+    subject_id TEXT,
+    student_id TEXT,
+    status TEXT DEFAULT "failed" CHECK(status IN ("passed", "failed")),
+    PRIMARY KEY (subject_id, student_id),
+    FOREIGN KEY (subject_id) REFERENCES subject(id),
+    FOREIGN KEY (student_id) REFERENCES student(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_grade_year_subject_student

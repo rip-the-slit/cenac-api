@@ -1,5 +1,6 @@
 import supertest from "supertest";
 import app from "../../src/app";
+import YearRepository from "../../src/repositories/YearRepository.js";
 const agent = supertest.agent(app);
 
 const ROOT = "/api/periods";
@@ -68,6 +69,7 @@ describe("Period Endpoint", () => {
       startYear: 2025,
       endYear: 2026,
       openingDate: "2025-10-10",
+      userId: 1,
     });
   });
 
@@ -79,6 +81,16 @@ describe("Period Endpoint", () => {
         subjects: { 1: [], 2: [] },
       })
       .expect(200, { loaded: true });
+
+    expect(
+      YearRepository.findAllAssignedClassesByPeriod(PERIOD_ID).map(
+        ({ name, studentCount, yearId }) => ({ name, studentCount, yearId })
+      )
+    ).toEqual([
+      { name: "A", studentCount: 1, yearId: 1 },
+      { name: "B", studentCount: 1, yearId: 1 },
+      { name: "A", studentCount: 1, yearId: 2 },
+    ]);
   });
 
   test("Returns the students in the period", async () => {
@@ -117,6 +129,12 @@ describe("Period Endpoint", () => {
       })
     );
     expect(res.body.rows).toHaveLength(3);
+    expect(res.body.years).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 1, abbr: "1er" }),
+        expect.objectContaining({ id: 2, abbr: "2do" }),
+      ])
+    );
     expect(res.body.recordsAmount).toBe(3);
     expect(res.body.rows.map(({ id }) => id)).toEqual([
       students.ana,
@@ -190,6 +208,7 @@ describe("Period Endpoint", () => {
       startYear: 2026,
       endYear: 2027,
       openingDate: "2025-10-10",
+      userId: 1,
     };
     expect(
       (
@@ -201,12 +220,13 @@ describe("Period Endpoint", () => {
     ).toMatchObject(newPeriod);
 
     const res = await agent.get(ROOT).expect(200);
-    expect(res.body[0]).toMatchObject(newPeriod)
+    expect(res.body[0]).toMatchObject(newPeriod);
     expect(res.body[1]).toMatchObject({
       status: "archived",
       startYear: 2025,
       endYear: 2026,
       openingDate: "2025-10-10",
+      userId: 1,
     });
 
     await agent
@@ -231,19 +251,71 @@ describe("Period Endpoint", () => {
       })
       .expect(200, { loaded: true });
 
-    const suggestions = await agent
-      .get(`${ROOT}/suggestions`)
-      .expect(200);
-    expect(suggestions.body.students).toEqual([
+  });
+
+  test("Returns suggestions only for students with an available next year", async () => {
+    const res = await agent.get(`${ROOT}/suggestions`).expect(200);
+
+    expect(res.body.students).toEqual([
       expect.objectContaining({
         id: students.ana,
+        firstName: "Ana",
+        lastName: "Alonso",
         _class: { id: "A", year: 2 },
       }),
       expect.objectContaining({
         id: students.bruno,
+        firstName: "Bruno",
+        lastName: "Benitez",
         _class: { id: "B", year: 2 },
       }),
     ]);
+    expect(res.body.students).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: students.carla }),
+      ])
+    );
+  });
+
+  test("Returns the suggestion form templates and Spanish field labels", async () => {
+    const res = await agent.get(`${ROOT}/suggestions`).expect(200);
+
+    expect(res.body).toMatchObject({
+      studentClass: {
+        id: "",
+        firstName: "",
+        lastName: "",
+        birthDate: "",
+        birthPlace: "",
+        _locked: false,
+        _class: { id: "", year: null },
+      },
+      guardianClass: {
+        id: "",
+        firstName: "",
+        lastName: "",
+        birthDate: "",
+        legalRole: "",
+        phone: "",
+        address: "",
+      },
+      studentFieldLabels: {
+        id: "Cédula",
+        firstName: "Nombres",
+        lastName: "Apellidos",
+        birthDate: "Fecha de Nacimiento",
+        birthPlace: "Lugar de Nacimiento",
+      },
+      guardianFieldLabels: {
+        id: "Cédula",
+        firstName: "Nombres",
+        lastName: "Apellidos",
+        birthDate: "Fecha de Nacimiento",
+        legalRole: "Rol Legal",
+        phone: "Teléfono",
+        address: "Dirección de Domicilio",
+      },
+    });
   });
 
   test("Returns aggregate statistics in the period model shape", async () => {
@@ -255,7 +327,7 @@ describe("Period Endpoint", () => {
       startYear: null,
       endYear: null,
       openingDate: null,
-      closingDate: null,
+      userId: null,
       stats: {
         grades: { total: 0, loaded: 0 },
         students: { total: 5, passed: 0 },
