@@ -7,36 +7,25 @@ class SubjectRepository {
   }
 
   findById(id) {
-    const query = this.db.prepare(`
-      SELECT *, minimum_grade as "minimumGrade" 
-      FROM subject 
-      WHERE id = CAST(? AS INTEGER)
-    `);
-    const result = query.get(id);
-
-    if (!result) return null;
-    return new Subject(
-      result.id,
-      result.name,
-      result.abbr,
-      result.minimumGrade
-    );
+    const row = this.db.prepare(`
+      SELECT *, minimum_grade as "minimumGrade"
+      FROM subject WHERE id = CAST(? AS INTEGER)
+    `).get(id);
+    return row
+      ? new Subject(row.id, row.name, row.abbr, row.minimumGrade)
+      : null;
   }
 
   findAll() {
-    const query = this.db.prepare(`
-      SELECT *, minimum_grade as "minimumGrade" 
-      FROM subject
-    `);
-    const results = query.all();
-
-    return results.map(
+    return this.db.prepare(`
+      SELECT *, minimum_grade as "minimumGrade" FROM subject
+    `).all().map(
       (row) => new Subject(row.id, row.name, row.abbr, row.minimumGrade)
     );
   }
 
   findAllByPeriod(periodId) {
-    const query = this.db.prepare(`
+    return this.db.prepare(`
       SELECT DISTINCT subject.id, subject.name, subject.abbr,
         subject.minimum_grade as "minimumGrade"
       FROM subject
@@ -44,172 +33,159 @@ class SubjectRepository {
       JOIN year_period ON year_period.id = year_subject.year_period_id
       WHERE year_period.period_id = ?
       ORDER BY subject.name COLLATE NOCASE ASC
-    `);
-
-    return query.all(periodId).map(
+    `).all(periodId).map(
       (row) => new Subject(row.id, row.name, row.abbr, row.minimumGrade)
     );
   }
 
+  findAllAssignmentsByPeriod(periodId) {
+    return this.db.prepare(`
+      SELECT subject.id as "subjectId", subject.name, subject.abbr,
+        subject.minimum_grade as "minimumGrade",
+        year_subject.id as "yearSubjectId",
+        year_period.year_id as "yearId",
+        year_period.period_id as "periodId"
+      FROM year_subject
+      JOIN subject ON subject.id = year_subject.subject_id
+      JOIN year_period ON year_period.id = year_subject.year_period_id
+      WHERE year_period.period_id = ?
+      ORDER BY year_period.year_id ASC, subject.id ASC
+    `).all(periodId);
+  }
 
   findAllGradesByStudents(periodId, studentIds) {
-    if (!Array.isArray(studentIds) || studentIds.length === 0) {
-      return [];
-    }
+    const uniqueStudentIds = [...new Set(studentIds)];
+    if (uniqueStudentIds.length === 0) return [];
 
-    const placeholders = studentIds.map(() => "?").join(", ");
+    const placeholders = uniqueStudentIds.map(() => "?").join(", ");
     const periodFilter = periodId === "all"
       ? ""
       : "AND year_period.period_id = ?";
     const query = this.db.prepare(`
-      WITH selected_grades AS (
-        SELECT grade.id as "gradeId",
-          grade.student_id as "studentId",
-          grade.term,
-          grade.strategy,
-          grade.value,
-          year_subject.id as "yearSubjectId",
-          year_subject.subject_id as "subjectId",
-          year_period.period_id as "periodId"
-        FROM grade
-        JOIN year_subject ON year_subject.id = grade.year_subject_id
-        JOIN year_period ON year_period.id = year_subject.year_period_id
-        WHERE grade.student_id IN (${placeholders})
-          ${periodFilter}
-      ),
-      subject_averages AS (
-        SELECT studentId, yearSubjectId, AVG(value) as "subjectAverage"
-        FROM selected_grades
-        WHERE value IS NOT NULL
-        GROUP BY studentId, yearSubjectId
-      ),
-      term_averages AS (
-        SELECT studentId, yearSubjectId, term, AVG(value) as "termAverage"
-        FROM selected_grades
-        WHERE value IS NOT NULL
-        GROUP BY studentId, yearSubjectId, term
-      )
-      SELECT selected_grades.*,
-        subject_averages.subjectAverage,
-        term_averages.termAverage
-      FROM selected_grades
-      LEFT JOIN subject_averages
-        ON subject_averages.studentId = selected_grades.studentId
-        AND subject_averages.yearSubjectId = selected_grades.yearSubjectId
-      LEFT JOIN term_averages
-        ON term_averages.studentId = selected_grades.studentId
-        AND term_averages.yearSubjectId = selected_grades.yearSubjectId
-        AND term_averages.term = selected_grades.term
-      ORDER BY selected_grades.studentId ASC,
-        selected_grades.subjectId ASC,
-        selected_grades.term ASC,
-        selected_grades.strategy ASC
+      SELECT grade.id as "gradeId",
+        grade.student_id as "studentId",
+        grade.term,
+        grade.strategy,
+        grade.value,
+        year_subject.id as "yearSubjectId",
+        year_subject.subject_id as "subjectId",
+        year_period.year_id as "yearId",
+        year_period.period_id as "periodId"
+      FROM grade
+      JOIN year_subject ON year_subject.id = grade.year_subject_id
+      JOIN year_period ON year_period.id = year_subject.year_period_id
+      WHERE grade.student_id IN (${placeholders})
+        ${periodFilter}
+      ORDER BY grade.student_id ASC,
+        year_period.year_id ASC,
+        year_subject.subject_id ASC,
+        grade.term ASC,
+        grade.strategy ASC
     `);
 
     const params = periodId === "all"
-      ? studentIds
-      : [...studentIds, periodId];
+      ? uniqueStudentIds
+      : [...uniqueStudentIds, periodId];
     return query.all(...params);
   }
+
   create(subject) {
-    const query = this.db.prepare(`
-      INSERT INTO subject (id, name, minimum_grade) 
-      VALUES (?, ?, ?)
-    `);
-    return query.run(subject.id, subject.name, subject.minimumGrade);
+    return this.db.prepare(`
+      INSERT INTO subject (id, name, minimum_grade) VALUES (?, ?, ?)
+    `).run(subject.id, subject.name, subject.minimumGrade);
   }
 
   update(id, subjectData) {
-    const query = this.db.prepare(`
-      UPDATE subject 
-      SET name = ?, minimum_grade = ? 
+    return this.db.prepare(`
+      UPDATE subject SET name = ?, minimum_grade = ?
       WHERE id = CAST(? AS INTEGER)
-    `);
-    return query.run(subjectData.name, subjectData.minimumGrade, id);
+    `).run(subjectData.name, subjectData.minimumGrade, id);
   }
 
   delete(id) {
-    const query = this.db.prepare(
-      `DELETE FROM subject WHERE id = CAST(? AS INTEGER)`
-    );
-    return query.run(id);
+    return this.db.prepare(
+      "DELETE FROM subject WHERE id = CAST(? AS INTEGER)"
+    ).run(id);
+  }
+
+  upsertGrades(grades, chunkSize = 100) {
+    const validGrades = grades.filter(Boolean);
+    let changes = 0;
+
+    for (let offset = 0; offset < validGrades.length; offset += chunkSize) {
+      const chunk = validGrades.slice(offset, offset + chunkSize);
+      const withId = chunk.filter(
+        (grade) => grade.id !== undefined && grade.id !== null && grade.id !== ""
+      );
+      const withoutId = chunk.filter((grade) => !withId.includes(grade));
+
+      if (withId.length > 0) {
+        const values = withId.map(() => "(?, ?, ?, ?, ?, ?)").join(", ");
+        const params = withId.flatMap((grade) => [
+          grade.id,
+          grade.term,
+          grade.value,
+          grade.strategy,
+          grade.studentId,
+          grade.yearSubjectId,
+        ]);
+        changes += this.db.prepare(`
+          INSERT INTO grade (
+            id, term, value, strategy, student_id, year_subject_id
+          ) VALUES ${values}
+          ON CONFLICT(id) DO UPDATE SET
+            term = excluded.term,
+            value = excluded.value,
+            strategy = excluded.strategy,
+            student_id = excluded.student_id,
+            year_subject_id = excluded.year_subject_id
+        `).run(...params).changes;
+      }
+
+      if (withoutId.length > 0) {
+        const values = withoutId.map(() => "(?, ?, ?, ?, ?)").join(", ");
+        const params = withoutId.flatMap((grade) => [
+          grade.term,
+          grade.value,
+          grade.strategy,
+          grade.studentId,
+          grade.yearSubjectId,
+        ]);
+        changes += this.db.prepare(`
+          INSERT INTO grade (
+            term, value, strategy, student_id, year_subject_id
+          ) VALUES ${values}
+          ON CONFLICT(term, strategy, year_subject_id, student_id)
+          DO UPDATE SET value = excluded.value
+        `).run(...params).changes;
+      }
+    }
+
+    return { changes };
   }
 
   assignGrade(grade) {
-    const id =
-      !grade.id &&
-      this.db
-        .prepare(
-          `SELECT id FROM grade WHERE student_id = ? AND year_subject_id = ? AND term = ? AND strategy = ?`
-        )
-        .get(grade.studentId, grade.yearSubjectId, grade.term, grade.strategy);
-
-    if (grade.id !== undefined && grade.id !== null && grade.id !== "") {
-      const query = this.db.prepare(`
-        INSERT INTO grade (${grade.id || id ? "id, " :  ""}term, value, strategy, student_id, year_subject_id) 
-        VALUES (${grade.id || id ? "?, " :  ""}?, ?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET
-          term = excluded.term,
-          value = excluded.value,
-          strategy = excluded.strategy,
-          student_id = excluded.student_id,
-          year_subject_id = excluded.year_subject_id
-      `);
-      return query.run(
-        grade.id || id,
-        grade.term,
-        grade.value,
-        grade.strategy,
-        grade.studentId,
-        grade.yearSubjectId
-      );
-    }
-
-    const query = this.db.prepare(`
-      INSERT INTO grade (term, value, strategy, student_id, year_subject_id) 
-      VALUES (?, ?, ?, ?, ?)
-      ON CONFLICT(term, strategy, year_subject_id, student_id) DO UPDATE SET
-        value = excluded.value,
-        strategy = excluded.strategy
-    `);
-    return query.run(
-      grade.term,
-      grade.value,
-      grade.strategy,
-      grade.studentId,
-      grade.yearSubjectId
-    );
+    return this.upsertGrades([grade]);
   }
 
   findAllGradesByStudent(yearSubjectId, studentId) {
-    const query = this.db.prepare(`
-      SELECT *, grade.student_id as "studentId", grade.year_subject_id as "yearSubjectId"
+    return this.db.prepare(`
+      SELECT *, student_id as "studentId", year_subject_id as "yearSubjectId"
       FROM grade
       WHERE year_subject_id = CAST(? AS INTEGER) AND student_id = ?
       ORDER BY term ASC, strategy ASC
-    `);
-    const results = query.all(yearSubjectId, studentId);
-    return results.map(
-      (row) =>
-        new Grade(
-          row.id,
-          row.term,
-          row.value,
-          row.strategy,
-          row.studentId,
-          row.yearSubjectId
-        )
+    `).all(yearSubjectId, studentId).map(
+      (row) => new Grade(
+        row.id,
+        row.term,
+        row.value,
+        row.strategy,
+        row.studentId,
+        row.yearSubjectId
+      )
     );
   }
 
-  getGradeAvgByStudent(yearSubjectId, studentId) {
-    const query = this.db.prepare(`
-      SELECT AVG(value) as "avg"
-      FROM grade WHERE year_subject_id = CAST(? AS INTEGER) AND student_id = ? AND value IS NOT NULL
-    `);
-    const result = query.get(yearSubjectId, studentId);
-    return result.avg;
-  }
 }
 
 export default new SubjectRepository(db);

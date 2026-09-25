@@ -20,12 +20,12 @@ describe("PeriodService", () => {
     });
 
     test("does not allow adding to a list already containing a new or active period", () => {
-      const periodList = structuredClone(samplePeriodList);
+      const periodList = samplePeriodList.map((period) => ({ ...period }));
       periodList.push(new Period(2024, "new", 2024, 2025, "2024-10-10"));
 
       expect(PeriodService.isPeriodListAddable(periodList)).toBeFalsy();
 
-      periodList.at(-1).status = "active";
+      periodList[periodList.length - 1].status = "active";
 
       expect(PeriodService.isPeriodListAddable(periodList)).toBeFalsy();
     });

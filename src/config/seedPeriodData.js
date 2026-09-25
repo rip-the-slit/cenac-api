@@ -109,7 +109,7 @@ export default function seedPeriodData(db) {
                 db.prepare(`
                   INSERT INTO grade (term, strategy, value, student_id, year_subject_id)
                   VALUES (?, ?, ?, ?, ?)
-                `).run(term, strategy, randomInt(10, 20), id, yearSubjectId);
+                `).run(term, strategy, randomInt(8, 20), id, yearSubjectId);
               }
             }
           }

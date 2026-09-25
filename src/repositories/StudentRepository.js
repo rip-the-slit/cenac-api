@@ -87,6 +87,7 @@ class StudentRepository {
     const addContainsFilter = (column, value) =>
       addFilter(value, `LOWER(${column}) LIKE ?`, (item) => [`%${item}%`]);
 
+    addFilter(filters.exactIds, "id = ?");
     addContainsFilter("id", filters.id);
     addContainsFilter("firstName", filters.firstName);
     addContainsFilter("lastName", filters.lastName);
@@ -203,7 +204,9 @@ class StudentRepository {
     const orderQuery = `
       ORDER BY lastName COLLATE NOCASE ASC,
         firstName COLLATE NOCASE ASC,
-        id ASC
+        id ASC,
+        yearId ASC,
+        className COLLATE NOCASE ASC
     `;
     const studentRowsQuery = `
       WITH student_rows AS (
@@ -226,6 +229,7 @@ class StudentRepository {
           ROW_NUMBER() OVER (
             PARTITION BY student.id
             ORDER BY CASE WHEN period.status = 'active' THEN 0 ELSE 1 END,
+              CASE WHEN class.name = 'z' THEN 1 ELSE 0 END,
               period.start_year DESC
           ) as "enrollmentRank"
         FROM student
@@ -342,6 +346,7 @@ class StudentRepository {
     const query = this.db.prepare(`
         INSERT INTO student_guardian (student_id, guardian_id)
         VALUES (?, ?)
+        ON CONFLICT(student_id, guardian_id) DO NOTHING
         `);
     return query.run(studentId, guardianId);
   }
@@ -364,6 +369,74 @@ class StudentRepository {
           row.address
         )
     );
+  }
+
+  syncAssignedGuardians(studentId, guardianIds) {
+    const uniqueIds = [...new Set(guardianIds.map(String))];
+    if (uniqueIds.length === 0) {
+      this.db.prepare(
+        "DELETE FROM student_guardian WHERE student_id = ?"
+      ).run(studentId);
+      return;
+    }
+
+    const placeholders = uniqueIds.map(() => "?").join(", ");
+    this.db.prepare(`
+      DELETE FROM student_guardian
+      WHERE student_id = ? AND guardian_id NOT IN (${placeholders})
+    `).run(studentId, ...uniqueIds);
+    for (const guardianId of uniqueIds) {
+      this.assignGuardian(studentId, guardianId);
+    }
+  }
+
+  assignPendingSubject(yearSubjectId, studentId) {
+    return this.db.prepare(`
+      INSERT INTO pending_subject (year_subject_id, student_id)
+      VALUES (?, ?)
+      ON CONFLICT(year_subject_id, student_id) DO NOTHING
+    `).run(yearSubjectId, studentId);
+  }
+
+  findAllPendingSubjectsByPeriod(periodId, studentId) {
+    return this.findAllPendingSubjectsByStudents(periodId, [studentId]);
+  }
+
+  findAllPendingSubjectsByStudents(periodId, studentIds) {
+    const uniqueStudentIds = [...new Set(studentIds.map(String))];
+    if (uniqueStudentIds.length === 0) return [];
+
+    const placeholders = uniqueStudentIds.map(() => "?").join(", ");
+    const periodFilter = periodId === "all"
+      ? ""
+      : "year_period.period_id = ? AND";
+    const params = periodId === "all"
+      ? uniqueStudentIds
+      : [periodId, ...uniqueStudentIds];
+    return this.db.prepare(`
+      SELECT subject.id as "subjectId", subject.name, subject.abbr,
+        subject.minimum_grade as "minimumGrade",
+        pending_subject.year_subject_id as "yearSubjectId",
+        pending_subject.student_id as "studentId",
+        pending_subject.status, year_period.year_id as "yearId",
+        year_period.period_id as "periodId"
+      FROM pending_subject
+      JOIN year_subject
+        ON year_subject.id = pending_subject.year_subject_id
+      JOIN year_period ON year_period.id = year_subject.year_period_id
+      JOIN subject ON subject.id = year_subject.subject_id
+      WHERE ${periodFilter}
+        pending_subject.student_id IN (${placeholders})
+      ORDER BY pending_subject.student_id ASC,
+        year_period.year_id ASC, subject.id ASC
+    `).all(...params);
+  }
+
+  updatePendingSubject(yearSubjectId, studentId, status) {
+    return this.db.prepare(`
+      UPDATE pending_subject SET status = ?
+      WHERE year_subject_id = ? AND student_id = ?
+    `).run(status, yearSubjectId, studentId);
   }
 
   assignToClass(studentId, classId, status) {
@@ -408,6 +481,7 @@ class StudentRepository {
       JOIN class ON class.id = student_class.class_id
       JOIN year_period ON year_period.id = class.year_period_id
       WHERE student_class.student_id = ? AND year_period.period_id = ?
+      ORDER BY CASE WHEN class.name = 'z' THEN 1 ELSE 0 END
     `);
     const result = query.get(studentId, periodId);
     if (!result) return null;

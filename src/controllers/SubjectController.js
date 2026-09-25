@@ -13,6 +13,15 @@ class SubjectController {
       res.status(e.status || 500).json({ error: e.message });
     }
   }
+
+  getSubjectSuggestions(req, res) {
+    try {
+      const data = this.subjectService.getSubjectSuggestions();
+      res.json(data);
+    } catch (e) {
+      res.status(e.status || 500).json({ error: e.message });
+    }
+  }
 }
 
 export default new SubjectController(SubjectService);

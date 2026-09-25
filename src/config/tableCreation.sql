@@ -104,11 +104,11 @@ CREATE TABLE IF NOT EXISTS student_class (
 );
 
 CREATE TABLE IF NOT EXISTS pending_subject (
-    subject_id TEXT,
+    year_subject_id INTEGER,
     student_id TEXT,
     status TEXT DEFAULT "failed" CHECK(status IN ("passed", "failed")),
-    PRIMARY KEY (subject_id, student_id),
-    FOREIGN KEY (subject_id) REFERENCES subject(id),
+    PRIMARY KEY (year_subject_id, student_id),
+    FOREIGN KEY (year_subject_id) REFERENCES year_subject(id),
     FOREIGN KEY (student_id) REFERENCES student(id)
 );
 

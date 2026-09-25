@@ -2,6 +2,7 @@ import PeriodRepository from "../repositories/PeriodRepository.js";
 import YearRepository from "../repositories/YearRepository.js";
 import StudentRepository from "../repositories/StudentRepository.js";
 import SubjectRepository from "../repositories/SubjectRepository.js";
+import GuardianRepository from "../repositories/GuardianRepository.js";
 import { Class, Period, PeriodStats, Student, Year } from "../models/index.js";
 
 class PeriodService {
@@ -9,12 +10,14 @@ class PeriodService {
     periodRepository,
     yearRepository,
     studentRepository,
-    subjectRepository
+    subjectRepository,
+    guardianRepository
   ) {
     this.periodRepository = periodRepository;
     this.yearRepository = yearRepository;
     this.studentRepository = studentRepository;
     this.subjectRepository = subjectRepository;
+    this.guardianRepository = guardianRepository;
   }
 
   isPeriod(period) {
@@ -30,7 +33,10 @@ class PeriodService {
 
   getPeriodFilterData(
     periodId,
-    { includeSubjects = false, useGeneralStatuses = false } = {}
+    {
+      includeSubjects = false,
+      useGeneralStatuses = false,
+    } = {}
   ) {
     const isAllPeriods = periodId === "all";
     const years = isAllPeriods
@@ -98,6 +104,14 @@ class PeriodService {
     const subjects = isAllPeriods
       ? this.subjectRepository.findAll()
       : this.subjectRepository.findAllByPeriod(periodId);
+    const assignedSubjectsByYear = isAllPeriods
+      ? {}
+      : Object.fromEntries(
+          years.map((year) => [
+            year.id,
+            this.yearRepository.findAllAssignedSubjects(year.yearPeriodId),
+          ])
+        );
     const subjectsByYear = isAllPeriods
       ? Object.fromEntries(
           years.map((year) => [year.id, subjects.map((subject) => subject.id)])
@@ -105,9 +119,7 @@ class PeriodService {
       : Object.fromEntries(
           years.map((year) => [
             year.id,
-            this.yearRepository
-              .findAllAssignedSubjects(year.yearPeriodId)
-              .map((subject) => subject.id),
+            assignedSubjectsByYear[year.id].map((subject) => subject.id),
           ])
         );
 
@@ -225,92 +237,168 @@ class PeriodService {
   // subjectsPerYear: { [yearId]: subjectId[] }
   // Only populates if the period has no students yet (mirrors frontend guard)
   loadPeriodData(periodId, students, subjectsPerYear) {
-    const period = this.periodRepository.findById(periodId);
-    this.isPeriod(period);
+    return this.periodRepository.db.transaction(() => {
+      const period = this.periodRepository.findById(periodId);
+      this.isPeriod(period);
 
-    if (period.status !== "new") {
-      return { loaded: false, reason: "already_loaded" };
-    }
-
-    const studentsToLoad = Array.isArray(students) ? students : [];
-    const subjectsByYear =
-      subjectsPerYear && typeof subjectsPerYear === "object"
-        ? subjectsPerYear
-        : {};
-
-    const yearPeriodMap = new Map();
-    const classMap = new Map();
-
-    for (const year of this.yearRepository.findAll()) {
-      if (!subjectsByYear[year.id]) {
-        continue;
+      if (period.status !== "new") {
+        return { loaded: false, reason: "already_loaded" };
       }
 
-      const yearPeriod = this.periodRepository.assignYear(year.id, period.id);
+      const studentsToLoad = Array.isArray(students) ? students : [];
+      const subjectsByYear =
+        subjectsPerYear && typeof subjectsPerYear === "object"
+          ? subjectsPerYear
+          : {};
+      const yearPeriodMap = new Map();
+      const yearSubjectMap = new Map();
+      const classMap = new Map();
 
-      for (const subjectId of subjectsByYear[year.id]) {
-        this.yearRepository.assignSubject(subjectId, yearPeriod.id);
+      for (const year of this.yearRepository.findAll()) {
+        if (!subjectsByYear[year.id]) continue;
+
+        const yearPeriod = this.periodRepository.assignYear(year.id, period.id);
+        yearPeriodMap.set(Number(year.id), yearPeriod);
+
+        for (const subjectId of subjectsByYear[year.id]) {
+          const result = this.yearRepository.assignSubject(
+            subjectId,
+            yearPeriod.id
+          );
+          yearSubjectMap.set(
+            `${Number(year.id)}-${String(subjectId)}`,
+            result.lastInsertRowid
+          );
+        }
       }
 
-      yearPeriodMap.set(Number(year.id), yearPeriod);
-    }
+      const expandedStudents = [];
+      const pendingAssignments = new Map();
+      for (const student of studentsToLoad) {
+        const yearId = Number(student._class?.year);
+        expandedStudents.push(student);
 
-    const classCounts = new Map();
-    for (const student of studentsToLoad) {
-      const yearId = Number(student._class?.year);
-      const className = student._class?.id;
-      const yp = yearPeriodMap.get(yearId);
-      if (!yp || !className) continue;
+        if (Object.prototype.hasOwnProperty.call(student, "assignedGuardians")) {
+          if (!Array.isArray(student.assignedGuardians)) {
+            const error = new Error(
+              "Los representantes asignados deben ser un arreglo"
+            );
+            error.status = 400;
+            throw error;
+          }
+          for (const guardian of student.assignedGuardians) {
+            if (!guardian?.id || !this.guardianRepository.findById(guardian.id)) {
+              const error = new Error(
+                `Representante no registrado: ${guardian?.id ?? "sin cédula"}`
+              );
+              error.status = 400;
+              throw error;
+            }
+          }
+        }
 
-      const key = `${yp.id}-${className}`;
-      if (!classCounts.has(key)) classCounts.set(key, new Set());
-      classCounts.get(key).add(student.id);
-    }
+        const previousYear = yearId - 1;
+        const assignedPendingSubjects = [];
+        for (const subjectId of Array.isArray(student.pendingSubjects)
+          ? student.pendingSubjects
+          : []) {
+          const yearSubjectId = yearSubjectMap.get(
+            `${previousYear}-${String(subjectId)}`
+          );
+          if (!yearSubjectId) continue;
 
-    for (const student of studentsToLoad) {
-      const existingStudent = this.studentRepository.findById(student.id);
-      if (!existingStudent) {
-        this.studentRepository.create(
-          new Student(
-            student.id,
-            student.firstName,
-            student.lastName,
-            student.birthDate,
-            student.birthPlace,
-            "active"
-          )
+          if (!pendingAssignments.has(student.id)) {
+            pendingAssignments.set(student.id, []);
+          }
+          pendingAssignments.get(student.id).push(yearSubjectId);
+          assignedPendingSubjects.push(subjectId);
+        }
+
+        if (assignedPendingSubjects.length > 0) {
+          expandedStudents.push({
+            ...student,
+            pendingSubjects: assignedPendingSubjects,
+            assignedGuardians: undefined,
+            _class: { id: "z", year: previousYear },
+          });
+        }
+      }
+
+      const classCounts = new Map();
+      for (const student of expandedStudents) {
+        const yearId = Number(student._class?.year);
+        const className = student._class?.id;
+        const yearPeriod = yearPeriodMap.get(yearId);
+        if (!yearPeriod || !className) continue;
+
+        const key = `${yearPeriod.id}-${className}`;
+        if (!classCounts.has(key)) classCounts.set(key, new Set());
+        classCounts.get(key).add(student.id);
+      }
+
+      const createdStudents = new Set();
+      for (const student of expandedStudents) {
+        if (!createdStudents.has(student.id)) {
+          if (!this.studentRepository.findById(student.id)) {
+            this.studentRepository.create(
+              new Student(
+                student.id,
+                student.firstName,
+                student.lastName,
+                student.birthDate,
+                student.birthPlace,
+                "active"
+              )
+            );
+          }
+          createdStudents.add(student.id);
+
+          for (const yearSubjectId of pendingAssignments.get(student.id) || []) {
+            this.studentRepository.assignPendingSubject(
+              yearSubjectId,
+              student.id
+            );
+          }
+
+          if (Object.prototype.hasOwnProperty.call(student, "assignedGuardians")) {
+            this.studentRepository.syncAssignedGuardians(
+              student.id,
+              student.assignedGuardians.map(({ id }) => id)
+            );
+          }
+        }
+
+        const yearId = Number(student._class?.year);
+        const className = student._class?.id;
+        const yearPeriod = yearPeriodMap.get(yearId);
+        if (!yearPeriod || !className) continue;
+
+        const classKey = `${yearPeriod.id}-${className}`;
+        let assignedClass = classMap.get(classKey);
+        if (!assignedClass) {
+          assignedClass = this.yearRepository.assignClass(
+            new Class(
+              null,
+              className,
+              classCounts.get(classKey)?.size ?? 0,
+              yearPeriod.id
+            )
+          );
+          classMap.set(classKey, assignedClass);
+        }
+
+        this.studentRepository.assignToClass(
+          student.id,
+          assignedClass.id,
+          "pending"
         );
       }
 
-      const yearId = Number(student._class?.year);
-      const className = student._class?.id;
-      const yp = yearPeriodMap.get(yearId);
-      if (!yp || !className) continue;
+      this.periodRepository.update(periodId, { ...period, status: "active" });
+      this.studentRepository.updateStatusByPeriod(periodId, "active");
 
-      let existingClass = classMap.get(`${yp.id}-${className}`);
-      if (!existingClass) {
-        existingClass = this.yearRepository.assignClass(
-          new Class(
-            null,
-            className,
-            classCounts.get(`${yp.id}-${className}`)?.size ?? 0,
-            yp.id
-          )
-        );
-        classMap.set(`${yp.id}-${className}`, existingClass);
-      }
-
-      this.studentRepository.assignToClass(
-        student.id,
-        existingClass.id,
-        "pending"
-      );
-    }
-
-    this.periodRepository.update(periodId, { ...period, status: "active" });
-    this.studentRepository.updateStatusByPeriod(periodId, "active");
-
-    return { loaded: true };
+      return { loaded: true };
+    });
   }
 
   archivePeriod(periodId, supersede, userId) {
@@ -351,5 +439,6 @@ export default new PeriodService(
   PeriodRepository,
   YearRepository,
   StudentRepository,
-  SubjectRepository
+  SubjectRepository,
+  GuardianRepository
 );

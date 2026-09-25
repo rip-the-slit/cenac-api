@@ -1,6 +1,5 @@
 import supertest from "supertest";
 import app from "../../src/app";
-import StudentRepository from "../../src/repositories/StudentRepository.js";
 
 const ROOT = "/api/guardians";
 const PERIOD_ROOT = "/api/periods";
@@ -75,17 +74,20 @@ beforeAll(async () => {
       openingDate: `${PERIOD_ID}-09-01`,
     })
     .expect(201);
-  await agent
-    .post(`${PERIOD_ROOT}/${PERIOD_ID}/load`)
-    .send({ students, subjects: { 1: [] } })
-    .expect(200, { loaded: true });
-
   for (const guardian of guardians) {
     await agent.post(ROOT).send(guardian).expect(201);
   }
-  StudentRepository.assignGuardian(students[0].id, guardians[0].id);
-  StudentRepository.assignGuardian(students[1].id, guardians[0].id);
-  StudentRepository.assignGuardian(students[1].id, guardians[1].id);
+
+  await agent
+    .post(PERIOD_ROOT + "/" + PERIOD_ID + "/load")
+    .send({
+      students: [
+        { ...students[0], assignedGuardians: [guardians[0]] },
+        { ...students[1], assignedGuardians: [guardians[0], guardians[1]] },
+      ],
+      subjects: { 1: [] },
+    })
+    .expect(200, { loaded: true });
 });
 
 describe("Guardian Endpoint", () => {
@@ -179,14 +181,4 @@ describe("Guardian Endpoint", () => {
     });
   });
 
-  test("student filters return every assigned guardian", async () => {
-    const res = await agent
-      .get(`${PERIOD_ROOT}/${PERIOD_ID}/students`)
-      .query({ guardianQ: "carlos benitez" })
-      .expect(200);
-
-    expect(res.body.recordsAmount).toBe(1);
-    expect(res.body.rows[0].id).toBe(students[1].id);
-    expect(res.body.rows[0].assignedGuardians).toHaveLength(2);
-  });
 });

@@ -2,94 +2,157 @@ import StudentService from "../../../src/services/StudentService";
 
 describe("StudentService", () => {
   describe("_parseStudentRows", () => {
-    test("groups guardians by student enrollment and removes duplicate joins", () => {
-      const enrollment = {
-        id: "student-1",
-        firstName: "Ana",
-        lastName: "Pérez",
-        periodId: 10,
-        className: "A",
-        yearId: 1,
-      };
+    test("deduplicates guardian joins without merging enrollments", () => {
       const guardian = {
         assignedGuardianId: "guardian-1",
         assignedGuardianFirstName: "María",
-        assignedGuardianLastName: "Pérez",
-        assignedGuardianLegalRole: "Madre",
       };
+      const rows = [
+        { id: "student-1", periodId: 10, yearId: 1, classDatabaseId: 1,
+          className: "z", ...guardian },
+        { id: "student-1", periodId: 10, yearId: 1, classDatabaseId: 1,
+          className: "z", ...guardian },
+        { id: "student-1", periodId: 10, yearId: 2, classDatabaseId: 2,
+          className: "A", ...guardian },
+      ];
 
-      const result = StudentService._parseStudentRows([
-        { ...enrollment, ...guardian },
-        { ...enrollment, ...guardian },
-        {
-          ...enrollment,
-          periodId: 11,
-          assignedGuardianId: "guardian-2",
-          assignedGuardianFirstName: "José",
-          assignedGuardianLastName: "Pérez",
-          assignedGuardianLegalRole: "Padre",
-        },
-      ]);
+      const result = StudentService._parseStudentRows(rows);
 
       expect(result).toHaveLength(2);
-      expect(result[0].assignedGuardians).toEqual([
-        expect.objectContaining({ id: "guardian-1", firstName: "María" }),
-      ]);
-      expect(result[1]).toMatchObject({
-        id: "student-1",
-        periodId: 11,
-        assignedGuardians: [
-          expect.objectContaining({ id: "guardian-2", firstName: "José" }),
-        ],
-      });
+      expect(result.every(({ assignedGuardians }) =>
+        assignedGuardians.length === 1
+      )).toBe(true);
     });
   });
 
   describe("_buildClassSuggestions", () => {
-    test("promotes eligible students to the same class in the next available year", () => {
-      const enrollments = [
-        {
-          id: "passed",
-          status: "passed",
-          _class: { id: "B", year: 1 },
-        },
-        {
-          id: "pending",
-          status: "pending",
-          _class: { id: "A", year: 1 },
-        },
-        {
-          id: "failed",
-          status: "failed",
-          _class: { id: "C", year: 1 },
-        },
-        {
-          id: "gap",
-          status: "passed",
-          _class: { id: "D", year: 2 },
-        },
-        {
-          id: "final",
-          status: "pending",
-          _class: { id: "E", year: 4 },
-        },
-      ];
+    const subjectRepository = StudentService.subjectRepository;
+    const originalAssignments = subjectRepository.findAllAssignmentsByPeriod;
+    const originalGrades = subjectRepository.findAllGradesByStudents;
+    const originalPending =
+      StudentService.studentRepository.findAllPendingSubjectsByStudents;
+
+    afterEach(() => {
+      subjectRepository.findAllAssignmentsByPeriod = originalAssignments;
+      subjectRepository.findAllGradesByStudents = originalGrades;
+      StudentService.studentRepository.findAllPendingSubjectsByStudents =
+        originalPending;
+    });
+
+    test("keeps a passed regular student back for failed floating subjects", () => {
+      let pendingCalls = 0;
+      StudentService.studentRepository.findAllPendingSubjectsByStudents =
+        (periodId, studentIds) => {
+          pendingCalls++;
+          expect(periodId).toBe("2025");
+          expect(studentIds).toEqual(["V-1"]);
+          return [{
+            studentId: "V-1",
+            periodId: "2025",
+            yearId: 1,
+            subjectId: 1,
+            status: "failed",
+          }];
+        };
+      const guardian = { id: "G-1", firstName: "María" };
 
       const result = StudentService._buildClassSuggestions(
-        enrollments,
-        [1, 2, 4]
+        [
+          {
+            id: "V-1",
+            firstName: "Ana",
+            status: "failed",
+            assignedGuardians: [guardian],
+            _class: { id: "z", year: 1 },
+          },
+          {
+            id: "V-1",
+            firstName: "Ana",
+            status: "passed",
+            assignedGuardians: [guardian],
+            _class: { id: "A", year: 2 },
+          },
+        ],
+        { id: "2025", startYear: 2025 },
+        { 1: [], 2: [], 3: [] }
       );
 
+      expect(pendingCalls).toBe(1);
       expect(result).toEqual([
         expect.objectContaining({
-          id: "passed",
-          _class: { id: "B", year: 2 },
-        }),
-        expect.objectContaining({
-          id: "pending",
-          _class: { id: "A", year: 2 },
+          id: "V-1",
+          pendingSubjects: [1],
+          assignedGuardians: [guardian],
+          _class: { id: "A", year: 2, originalYear: 2 },
         }),
       ]);
+    });
+
+    test("bulk-calculates pending regular students and promotes them", () => {
+      let assignmentCalls = 0;
+      let gradeCalls = 0;
+      subjectRepository.findAllAssignmentsByPeriod = () => {
+        assignmentCalls++;
+        return [1, 2].map((subjectId) => ({
+          subjectId,
+          yearSubjectId: subjectId,
+          yearId: 1,
+          minimumGrade: 10,
+        }));
+      };
+      subjectRepository.findAllGradesByStudents = (periodId, studentIds) => {
+        gradeCalls++;
+        expect(periodId).toBe("2025");
+        expect(studentIds).toEqual(["V-2"]);
+        return [{
+          studentId: "V-2",
+          periodId: "2025",
+          yearId: 1,
+          yearSubjectId: 1,
+          subjectId: 1,
+          term: 4,
+          strategy: 1,
+          value: 12,
+        }];
+      };
+
+      const result = StudentService._buildClassSuggestions(
+        [{
+          id: "V-2",
+          status: "pending",
+          assignedGuardians: [],
+          _class: { id: "B", year: 1 },
+        }],
+        { id: "2025", startYear: 2025 },
+        { 1: [1, 2], 2: [] },
+        [
+          { id: 1, minimumGrade: 10 },
+          { id: 2, minimumGrade: 10 },
+        ]
+      );
+
+      expect(assignmentCalls).toBe(1);
+      expect(gradeCalls).toBe(1);
+      expect(result[0]).toMatchObject({
+        id: "V-2",
+        pendingSubjects: [2],
+        _class: { id: "B", year: 2, originalYear: 1 },
+      });
+    });
+
+    test("does not treat an uppercase Z class as floating", () => {
+      const result = StudentService._buildClassSuggestions(
+        [{
+          id: "V-3",
+          status: "passed",
+          assignedGuardians: [],
+          _class: { id: "Z", year: 1 },
+        }],
+        { id: "2025", startYear: 2025 },
+        { 1: [], 2: [] }
+      );
+
+      expect(result[0]._class).toEqual({ id: "Z", year: 2, originalYear: 1 });
     });
   });
 });

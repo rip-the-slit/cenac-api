@@ -18,7 +18,7 @@ class ReportController {
 
   async generateGradesReport(req, res) {
     try {
-      const { periodId, q, terms } = req.query;
+      const { periodId, q, terms, preview } = req.query;
       if (!periodId) {
         return res.status(400).json({ error: "El identificador del periodo es requerido" });
       }
@@ -26,14 +26,15 @@ class ReportController {
       const buffer = await this.reportService.generateGradesReport(
         periodId,
         q,
-        terms
+        terms,
+        preview === "true"
       );
       res.setHeader("Content-Type", WORD_MIME);
       res.setHeader(
         "Content-Disposition",
         'attachment; filename="grades-report.docx"'
       );
-      res.send(buffer);
+      res.end(buffer);
     } catch (e) {
       res.status(e.status || 500).json({ error: e.message });
     }

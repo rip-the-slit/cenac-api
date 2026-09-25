@@ -1,5 +1,6 @@
 import ReportService from "../../../src/services/ReportService";
-import { Document, Packer } from "docx";
+import docx from "docx";
+const { Document, Packer } = docx;
 import JSZip from "jszip";
 
 describe("ReportService", () => {
@@ -17,8 +18,9 @@ describe("ReportService", () => {
           [18, 16, null, null, null],
           [null, null, null, null, null],
           [null, null, null, null, null],
+          [20],
         ],
-        termAverages: [17, null, null],
+        termAverages: [17, null, null, 20],
       },
     },
   };
@@ -72,7 +74,11 @@ describe("ReportService", () => {
     expect(xml).toContain("3ER LAPSO");
     expect(xml).toContain("Matemáticas");
     expect(xml).toContain("31/08/2026");
-    expect((xml.match(/M. Pendiente:/g) || [])).toHaveLength(3);
+    expect(xml).toContain("MATERIAS PENDIENTES");
+    expect(xml).toContain("Materia pendiente");
+    expect(xml).toContain("M1");
+    expect(xml).toContain("M4");
+    expect(xml).toContain("[LOGO DE LA INSTITUCIÓN]");
   });
 
   test("builds five strategy columns for a selected lapso", async () => {
@@ -90,5 +96,43 @@ describe("ReportService", () => {
     expect(xml).toContain("Estrategia 5");
     expect(xml).toContain("Definitiva");
     expect(xml).not.toContain("2DO LAPSO");
+    expect(xml).not.toContain("MATERIAS PENDIENTES");
+  });
+
+  test("merges floating grades into one regular report record", () => {
+    const rows = ReportService._mergeFloatingEnrollments([
+      { ...gradeRecord, periodId: "2090", className: "A" },
+      {
+        ...gradeRecord,
+        periodId: "2090",
+        className: "z",
+        floating: true,
+        subjectDetails: { 2: { termAverages: [8, 10, null, 12] } },
+      },
+    ]);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      className: "A",
+      pendingSubjectDetails: {
+        2: { termAverages: [8, 10, null, 12] },
+      },
+    });
+  });
+
+  test("limits grade retrieval to five rows for previews", async () => {
+    const original = ReportService.gradeService.getGrades;
+    let receivedFilters;
+    ReportService.gradeService.getGrades = (_periodId, filters) => {
+      receivedFilters = filters;
+      return { rows: [], subjects: [], years: [] };
+    };
+
+    try {
+      await ReportService.generateGradesReport("2090", "ana", "all", true);
+      expect(receivedFilters).toEqual({ q: "ana", page: 1, limit: 5 });
+    } finally {
+      ReportService.gradeService.getGrades = original;
+    }
   });
 });

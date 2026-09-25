@@ -1,0 +1,43 @@
+import {
+  BorderStyle, Document, Packer, Paragraph, Table, TableCell, TableRow,
+  TextRun, VerticalAlign, WidthType,
+} from 'docx';
+import { writeFile } from 'node:fs/promises';
+
+const outputPath = 'Diccionario_de_Datos_Modelo_Relacional.docx';
+const createdOn = new Intl.DateTimeFormat('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date());
+
+// Entidades tomadas directamente del diagrama modelo_relacional_pst2026_v2.drawio.png.
+// Los campos de las entidades equivalentes proceden del esquema SQL vigente.
+const tables = [
+  ['periodo', 'Periodos escolares.', [['id', 'TEXT', 'Identificador único del periodo. Clave primaria.'], ['estado', 'TEXT', 'Estado del periodo: nuevo, activo o archivado.'], ['año_inicio', 'INTEGER', 'Año de inicio.'], ['año_fin', 'INTEGER', 'Año de término.'], ['fecha_apertura', 'DATE', 'Fecha de apertura.'], ['fecha_cierre', 'DATE', 'Fecha de cierre.']], 'año_periodo.periodo_id → periodo.id', 'id'],
+  ['materia', 'Materias del plan de estudios.', [['id', 'INTEGER', 'Identificador único. Clave primaria autoincremental.'], ['nombre', 'TEXT', 'Nombre de la materia. Obligatorio.'], ['abreviatura', 'TEXT', 'Abreviatura de la materia.'], ['nota_mínima', 'REAL', 'Calificación mínima requerida.']], 'materia_año.materia_id → materia.id; materia_pendiente.materia_id → materia.id', 'id'],
+  ['representante', 'Padres, madres, tutores o responsables legales.', [['id', 'TEXT', 'Identificador único. Clave primaria.'], ['nombres', 'TEXT', 'Nombre(s). Obligatorio.'], ['apellidos', 'TEXT', 'Apellidos. Obligatorio.'], ['fecha_nacimiento', 'DATE', 'Fecha de nacimiento.'], ['rol_legal', 'TEXT', 'Rol o parentesco legal. Obligatorio.'], ['teléfono', 'TEXT', 'Número telefónico.'], ['dirección', 'TEXT', 'Domicilio.']], 'representante_estudiante.representante_id → representante.id', 'id'],
+  ['estudiante', 'Estudiantes registrados.', [['id', 'TEXT', 'Identificador único. Clave primaria.'], ['nombres', 'TEXT', 'Nombre(s). Obligatorio.'], ['apellidos', 'TEXT', 'Apellidos. Obligatorio.'], ['fecha_nacimiento', 'DATE', 'Fecha de nacimiento.'], ['lugar_nacimiento', 'TEXT', 'Lugar de nacimiento.'], ['estado', 'TEXT', 'Estado: activo o inactivo.']], 'nota.estudiante_id → estudiante.id; representante_estudiante.estudiante_id → estudiante.id; estudiante_sección.estudiante_id → estudiante.id; materia_pendiente.estudiante_id → estudiante.id', 'id'],
+  ['año', 'Grados o años escolares.', [['id', 'INTEGER', 'Identificador único. Clave primaria autoincremental.'], ['nombre', 'TEXT', 'Nombre del grado o año. Obligatorio.']], 'año_periodo.año_id → año.id', 'id'],
+  ['usuario', 'Usuarios del sistema.', [['id', 'INTEGER', 'Identificador único. Clave primaria autoincremental.'], ['nombre', 'TEXT', 'Nombre de usuario. Obligatorio.'], ['contraseña', 'TEXT', 'Contraseña del usuario. Obligatoria.'], ['nivel_usuario', 'TEXT', 'Nivel: Administrador, Coordinador o Profesor.']], '—', 'id'],
+  ['año_periodo', 'Relación entre año escolar y periodo.', [['id', 'INTEGER', 'Identificador único. Clave primaria autoincremental.'], ['año_id', 'INTEGER', 'Año escolar. Clave foránea a año.id.'], ['periodo_id', 'TEXT', 'Periodo escolar. Clave foránea a periodo.id.']], 'año_id → año.id; periodo_id → periodo.id; materia_año.año_periodo_id → año_periodo.id; seccion.año_periodo_id → año_periodo.id', 'id; UNIQUE(año_id, periodo_id)'],
+  ['materia_año', 'Materias asignadas a un año y periodo.', [['id', 'INTEGER', 'Identificador único. Clave primaria autoincremental.'], ['año_periodo_id', 'INTEGER', 'Año y periodo relacionados. Clave foránea a año_periodo.id.'], ['materia_id', 'INTEGER', 'Materia relacionada. Clave foránea a materia.id.']], 'año_periodo_id → año_periodo.id; materia_id → materia.id; nota.materia_año_id → materia_año.id; materia_pendiente.materia_año_id → materia_año.id', 'id; UNIQUE(año_periodo_id, materia_id)'],
+  ['seccion', 'Secciones o grupos por año y periodo.', [['id', 'INTEGER', 'Identificador único. Clave primaria autoincremental.'], ['nombre', 'TEXT', 'Nombre o sección del grupo.'], ['año_periodo_id', 'INTEGER', 'Año y periodo. Clave foránea a año_periodo.id.'], ['turno', 'TEXT', 'Turno de la sección.'], ['ubicación', 'TEXT', 'Aula o ubicación asignada.'], ['cupo', 'INTEGER', 'Cupo máximo.']], 'año_periodo_id → año_periodo.id; estudiante_sección.seccion_id → seccion.id', 'id; UNIQUE(nombre, año_periodo_id)'],
+  ['nota', 'Calificaciones de estudiantes por materia.', [['id', 'INTEGER', 'Identificador único. Clave primaria autoincremental.'], ['lapso', 'INTEGER', 'Periodo parcial de evaluación.'], ['estrategia', 'INTEGER', 'Estrategia o modalidad de evaluación.'], ['valor', 'REAL', 'Valor numérico de la calificación.'], ['estudiante_id', 'TEXT', 'Estudiante evaluado. Clave foránea a estudiante.id.'], ['materia_año_id', 'INTEGER', 'Materia correspondiente al año y periodo. Clave foránea a materia_año.id.']], 'estudiante_id → estudiante.id; materia_año_id → materia_año.id', 'id; UNIQUE(lapso, estrategia, materia_año_id, estudiante_id)'],
+  ['representante_estudiante', 'Relación entre representantes y estudiantes.', [['estudiante_id', 'TEXT', 'Estudiante relacionado. Clave primaria compuesta y foránea a estudiante.id.'], ['representante_id', 'TEXT', 'Representante relacionado. Clave primaria compuesta y foránea a representante.id.']], 'estudiante_id → estudiante.id; representante_id → representante.id', 'PRIMARY KEY(estudiante_id, representante_id)'],
+  ['estudiante_sección', 'Inscripción de estudiantes en secciones.', [['estudiante_id', 'TEXT', 'Estudiante inscrito. Clave primaria compuesta y foránea a estudiante.id.'], ['seccion_id', 'INTEGER', 'Sección asignada. Clave primaria compuesta y foránea a seccion.id.'], ['estado', 'TEXT', 'Resultado: pendiente, aprobado o reprobado.']], 'estudiante_id → estudiante.id; seccion_id → seccion.id', 'PRIMARY KEY(estudiante_id, seccion_id)'],
+  ['materia_pendiente', 'Materias pendientes de un estudiante.', [['id', 'INTEGER', 'Identificador único del registro. Clave primaria autoincremental.'], ['estudiante_id', 'TEXT', 'Estudiante con materia pendiente. Clave foránea a estudiante.id.'], ['materia_id', 'INTEGER', 'Materia pendiente. Clave foránea a materia.id.'], ['materia_año_id', 'INTEGER', 'Materia en el año y periodo correspondiente. Clave foránea a materia_año.id.'], ['estado', 'TEXT', 'Estado de la materia pendiente.']], 'estudiante_id → estudiante.id; materia_id → materia.id; materia_año_id → materia_año.id', 'id; UNIQUE(estudiante_id, materia_año_id)'],
+];
+
+const line = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
+const borders = { top: line, bottom: line, left: line, right: line, insideHorizontal: line, insideVertical: line };
+const p = (text, bold = false) => new Paragraph({ spacing: { after: 0 }, children: [new TextRun({ text, font: 'Arial', size: 18, bold })] });
+const c = (text, width, bold = false, fill) => new TableCell({ verticalAlign: VerticalAlign.CENTER, width: { size: width, type: WidthType.DXA }, shading: fill ? { fill } : undefined, margins: { top: 50, bottom: 50, left: 80, right: 80 }, children: [p(text, bold)] });
+const infoRow = (label, value) => new TableRow({ children: [c(label, 1800, true), c(value, 9200)] });
+
+function section([name, description, fields, relations, keys], last) {
+  const top = new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders, rows: [new TableRow({ children: [c('Nombre de Archivo: ' + name, 2600, true)] }), new TableRow({ children: [c('Descripción: ' + description, 2600, true)] }) ] });
+  const fieldTable = new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders, rows: [new TableRow({ tableHeader: true, children: [c('Campo', 2500, true, 'E7E6E6'), c('Tipo de Dato', 2100, true, 'E7E6E6'), c('Descripción', 6500, true, 'E7E6E6')] }), ...fields.map(([field, type, desc]) => new TableRow({ children: [c(field, 2500), c(type, 2100), c(desc, 6500)] }))] });
+  const bottom = new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders, rows: [new TableRow({ children: [c('Relaciones:', 6000, true), c('Campos Clave:', 6000, true)] }), new TableRow({ children: [c(relations, 6000), c(keys, 6000)] })] });
+  return [top, fieldTable, bottom, ...(last ? [] : [new Paragraph({ spacing: { after: 100 } })])];
+}
+
+const document = new Document({ sections: [{ properties: { page: { margin: { top: 400, right: 400, bottom: 400, left: 400 } } }, children: tables.flatMap((table, index) => section(table, index === tables.length - 1)) }] });
+await writeFile(outputPath, await Packer.toBuffer(document));
+console.log(`Documento generado: ${outputPath}`);

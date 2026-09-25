@@ -13,6 +13,27 @@ const students = {
   diego: "V-10000004",
 };
 
+const periodGuardians = [
+  {
+    id: "V-22000001",
+    firstName: "Maria",
+    lastName: "Benitez",
+    birthDate: "1980-01-01",
+    legalRole: "Madre",
+    phone: "0412-0000001",
+    address: "Caracas",
+  },
+  {
+    id: "V-22000002",
+    firstName: "Carlos",
+    lastName: "Benitez",
+    birthDate: "1979-01-01",
+    legalRole: "Padre",
+    phone: "0412-0000002",
+    address: "Caracas",
+  },
+];
+
 const periodStudents = [
   {
     id: students.ana,
@@ -74,10 +95,19 @@ describe("Period Endpoint", () => {
   });
 
   test("Loads the period students", async () => {
+    for (const guardian of periodGuardians) {
+      await agent.post("/api/guardians").send(guardian).expect(201);
+    }
+
     await agent
       .post(`${ROOT}/${PERIOD_ID}/load`)
       .send({
-        students: periodStudents,
+        students: periodStudents.map((student) => ({
+          ...student,
+          ...(student.id === students.bruno
+            ? { assignedGuardians: periodGuardians }
+            : {}),
+        })),
         subjects: { 1: [], 2: [] },
       })
       .expect(200, { loaded: true });
@@ -189,6 +219,17 @@ describe("Period Endpoint", () => {
     }
   );
 
+  test("Filters students by guardian and returns every assignment", async () => {
+    const res = await agent
+      .get(`${ROOT}/${PERIOD_ID}/students`)
+      .query({ guardianQ: "carlos benitez" })
+      .expect(200);
+
+    expect(res.body.recordsAmount).toBe(1);
+    expect(res.body.rows[0].id).toBe(students.bruno);
+    expect(res.body.rows[0].assignedGuardians).toHaveLength(2);
+  });
+
   test("Returns enrollment data for an individual period student", async () => {
     const res = await agent
       .get(`${ROOT}/${PERIOD_ID}/students/${students.ana}`)
@@ -261,13 +302,13 @@ describe("Period Endpoint", () => {
         id: students.ana,
         firstName: "Ana",
         lastName: "Alonso",
-        _class: { id: "A", year: 2 },
+        _class: expect.objectContaining({ id: "A", year: 2 }),
       }),
       expect.objectContaining({
         id: students.bruno,
         firstName: "Bruno",
         lastName: "Benitez",
-        _class: { id: "B", year: 2 },
+        _class: expect.objectContaining({ id: "B", year: 2 }),
       }),
     ]);
     expect(res.body.students).not.toEqual(

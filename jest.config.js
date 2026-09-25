@@ -1,5 +1,3 @@
-import { defineConfig } from "jest";
-
-export default defineConfig({
+export default {
   transform: {},
-});
+};

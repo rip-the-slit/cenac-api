@@ -26,8 +26,16 @@ app.use((err, req, res, next) => {
 });
 
 if (!isTesting) {
-  app.listen(PORT, console.log);
-  // open(`http://localhost:${PORT}/`);
+  const server = app.listen(PORT, () => {
+    console.log(`Cenac JGR se inició en http://localhost:${PORT}/`);
+    open(`http://localhost:${PORT}/`).catch((error) => {
+      console.warn(`No se logró abrir el navegador, intente acceder a la url manualmente: ${error.message}`);
+    });
+  });
+  server.on("error", (error) => {
+    console.error(`No se logró iniciar Cenac JGR: ${error.message}`);
+    process.exitCode = 1;
+  });
 }
 
 export default app;

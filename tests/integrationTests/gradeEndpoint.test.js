@@ -1,5 +1,6 @@
 import supertest from "supertest";
 import app from "../../src/app";
+import StudentRepository from "../../src/repositories/StudentRepository.js";
 const agent = supertest.agent(app);
 
 const ROOT = "/api/grades";
@@ -54,9 +55,10 @@ beforeAll(async () => {
           birthDate: "2078-03-01",
           birthPlace: "Caracas",
           _class: { id: "A", year: 2 },
+          pendingSubjects: [1],
         },
       ],
-      subjects: { 1: [1], 2: [3] },
+      subjects: { 1: [1], 2: [1, 3] },
     })
     .expect(200, { loaded: true });
 });
@@ -74,6 +76,34 @@ describe("Grade Endpoint", () => {
       .expect(200);
 
     expect(res.body).toEqual({ loaded: 2, skipped: 0 });
+  });
+
+  test("loads regular and floating grades independently", async () => {
+    await agent
+      .post("/api/grades/load")
+      .send({
+        periodId: PERIOD_ID,
+        grades: [
+          {
+            id: students.carla,
+            yearId: 2,
+            subjects: { 1: [[5]], 3: [[15]] },
+          },
+          {
+            id: students.carla,
+            yearId: 1,
+            subjects: { 1: [[6], [10], [], [9]] },
+          },
+        ],
+      })
+      .expect(200, { loaded: 2, skipped: 0 });
+
+    expect(
+      StudentRepository.findAllPendingSubjectsByPeriod(
+        PERIOD_ID,
+        students.carla
+      )
+    ).toEqual([expect.objectContaining({ subjectId: 1, status: "passed" })]);
   });
 
   test("returns the loaded grades", async () => {
@@ -115,10 +145,10 @@ describe("Grade Endpoint", () => {
         subjectDetails: expect.any(Object),
       })
     );
-    expect(res.body.rows).toHaveLength(3);
-    expect(res.body.recordsAmount).toBe(3);
+    expect(res.body.rows).toHaveLength(4);
+    expect(res.body.recordsAmount).toBe(4);
     expect(res.body.rows.map(({ id }) => id)).toEqual([
-      students.ana, students.bruno, students.carla,
+      students.ana, students.bruno, students.carla, students.carla,
     ]);
     expect(res.body.rows).toEqual(
       expect.arrayContaining([
@@ -126,27 +156,31 @@ describe("Grade Endpoint", () => {
           id: students.ana,
           fullName: "Alonso Ana",
           period: Number(PERIOD_ID),
-          status: "passed",
-          subjectAverages: { 1: 17 },
+          status: "pending",
+          subjectAverages: { 1: 2 },
         }),
         expect.objectContaining({
           id: students.bruno,
           status: "pending",
-          subjectAverages: { 1: 7 },
+          subjectAverages: { 1: 1 },
         }),
         expect.objectContaining({
           id: students.carla,
-          subjectAverages: { 3: null },
+          yearId: 2,
+          status: "pending",
+          subjectAverages: { 1: 0, 3: 1 },
+        }),
+        expect.objectContaining({
+          id: students.carla,
+          yearId: 1,
+          floating: true,
+          status: "passed",
+          subjectAverages: { 1: 5 },
           subjectDetails: {
-            3: {
-              avg: null,
-              terms: [
-                [null, null, null, null, null],
-                [null, null, null, null, null],
-                [null, null, null, null, null],
-              ],
-              termAverages: [null, null, null],
-            },
+            1: expect.objectContaining({
+              terms: [[6], [10], [null], [9]],
+              termAverages: [6, 10, 0, 9],
+            }),
           },
         }),
       ])
@@ -156,7 +190,7 @@ describe("Grade Endpoint", () => {
   test.each([
     ["year", { yearId: 2 }, [students.carla], 1],
     ["class", { classId: "B" }, [students.bruno], 1],
-    ["status", { status: "pending" }, [students.bruno, students.carla], 2],
+    ["status", { status: "pending" }, [students.ana, students.bruno, students.carla], 3],
     ["name", { q: "ana alonso" }, [students.ana], 1],
     [
       "multiple names",
@@ -164,7 +198,7 @@ describe("Grade Endpoint", () => {
       [students.ana, students.bruno],
       2,
     ],
-    ["page", { page: 1, limit: 2 }, [students.ana, students.bruno], 3],
+    ["page", { page: 1, limit: 2 }, [students.ana, students.bruno], 4],
   ])("filters by %s", async (_filter, query, expectedIds, recordsAmount) => {
     const res = await agent
       .get(ROOT)
@@ -212,21 +246,21 @@ describe("Grade Endpoint", () => {
       .expect(200);
     const anaRows = res.body.rows.filter(({ id }) => id === students.ana);
 
-    expect(res.body.recordsAmount).toBe(4);
+    expect(res.body.recordsAmount).toBe(5);
     expect(res.body.studentGradesFieldLabels.period).toBe(
       "Periodo Escolar"
     );
-    expect(res.body.rows).toHaveLength(4);
+    expect(res.body.rows).toHaveLength(5);
     expect(anaRows).toHaveLength(2);
     expect(anaRows).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           period: Number(PERIOD_ID),
-          subjectAverages: expect.objectContaining({ 1: 17 }),
+          subjectAverages: expect.objectContaining({ 1: 2 }),
         }),
         expect.objectContaining({
           period: Number(NEXT_PERIOD_ID),
-          subjectAverages: expect.objectContaining({ 3: 14 }),
+          subjectAverages: expect.objectContaining({ 3: 1 }),
         }),
       ])
     );
@@ -252,7 +286,7 @@ describe("Grade Endpoint", () => {
       .get(ROOT)
       .query({ periodId: "all", page: 1, limit: 2 })
       .expect(200);
-    expect(paged.body.recordsAmount).toBe(4);
+    expect(paged.body.recordsAmount).toBe(5);
     expect(paged.body.rows).toHaveLength(2);
   });
 });
