@@ -1,6 +1,7 @@
 {
   "type": "module",
   "scripts": {
+    "build:win7": "bash scripts/build-windows7.sh",
     "dev": "nodemon ./src/app.js",
     "test": "NODE_ENV=\"test\" NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" jest --watch"
   },
