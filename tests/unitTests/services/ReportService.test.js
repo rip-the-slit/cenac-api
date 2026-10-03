@@ -78,7 +78,6 @@ describe("ReportService", () => {
     expect(xml).toContain("Materia pendiente");
     expect(xml).toContain("M1");
     expect(xml).toContain("M4");
-    expect(xml).toContain("[LOGO DE LA INSTITUCIÓN]");
   });
 
   test("builds five strategy columns for a selected lapso", async () => {

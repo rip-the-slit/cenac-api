@@ -157,7 +157,7 @@ class ReportService {
       : gradeRecord.class;
     const academicPeriod = gradeRecord.period + " - " + (Number(gradeRecord.period) + 1);
 
-    const logoPath = path.resolve("public/logo.png");
+    const logoPath = path.resolve("public/logo.jpg");
     const logoParagraph = fs.existsSync(logoPath)
       ? new Paragraph({
           alignment: AlignmentType.CENTER,
@@ -165,7 +165,7 @@ class ReportService {
             new ImageRun({
               type: "png",
               data: fs.readFileSync(logoPath),
-              transformation: { width: 72, height: 72 },
+              transformation: { width: 120, height: 120 },
               altText: {
                 name: "Logo institucional",
                 title: "Logo institucional",
