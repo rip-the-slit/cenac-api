@@ -386,7 +386,7 @@ class GradeService {
                   !Array.isArray(rawGrade);
                 const strategy =
                   (isObject && Number(rawGrade.strategy)) || strategyIndex + 1;
-                if (strategy < 1 || strategy > maxStrategies) return;
+                if (strategy < 1 || strategy > maxStrategies || rawGrade === null) return;
 
                 pendingGrades.push(
                   new Grade(

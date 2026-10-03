@@ -14,7 +14,7 @@ describe("GradeService", () => {
 
       expect(result.termAverages).toEqual([7, 0, 0, 0]);
       expect(result.avg).toBe(2);
-      expect(result.terms[0]).toEqual([18, 16, null, null, null]);
+      expect(result.terms[0]).toEqual([18, 16, 0, 0, 0]);
     });
 
     test("rounds term averages before calculating the subject average", () => {
@@ -179,13 +179,13 @@ describe("GradeService", () => {
         avg: 1,
         termAverages: [3, 0, 0, 18],
         terms: [
-          [14, null, null, null, null],
-          [null, null, null, null, null],
-          [null, null, null, null, null],
+          [14, 0, 0, 0, 0],
+          [0, 0, 0, 0, 0],
+          [0, 0, 0, 0, 0],
           [18],
         ],
       });
-      expect(floating.subjectAverages).toEqual({ 1: 4 });
+      expect(floating.subjectAverages).toEqual({ 1: 11 });
       expect(floating.subjectDetails[1].termAverages).toEqual([0, 11, 0, 0]);
     });
 

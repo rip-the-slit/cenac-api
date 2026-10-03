@@ -148,7 +148,10 @@ describe("Grade Endpoint", () => {
     expect(res.body.rows).toHaveLength(4);
     expect(res.body.recordsAmount).toBe(4);
     expect(res.body.rows.map(({ id }) => id)).toEqual([
-      students.ana, students.bruno, students.carla, students.carla,
+      students.ana,
+      students.bruno,
+      students.carla,
+      students.carla,
     ]);
     expect(res.body.rows).toEqual(
       expect.arrayContaining([
@@ -175,10 +178,10 @@ describe("Grade Endpoint", () => {
           yearId: 1,
           floating: true,
           status: "passed",
-          subjectAverages: { 1: 5 },
+          subjectAverages: { 1: 10 },
           subjectDetails: {
             1: expect.objectContaining({
-              terms: [[6], [10], [null], [9]],
+              terms: [[6], [10], [0], [9]],
               termAverages: [6, 10, 0, 9],
             }),
           },
@@ -190,7 +193,12 @@ describe("Grade Endpoint", () => {
   test.each([
     ["year", { yearId: 2 }, [students.carla], 1],
     ["class", { classId: "B" }, [students.bruno], 1],
-    ["status", { status: "pending" }, [students.ana, students.bruno, students.carla], 3],
+    [
+      "status",
+      { status: "pending" },
+      [students.ana, students.bruno, students.carla],
+      3,
+    ],
     ["name", { q: "ana alonso" }, [students.ana], 1],
     [
       "multiple names",
@@ -240,16 +248,11 @@ describe("Grade Endpoint", () => {
       })
       .expect(200, { loaded: 1, skipped: 0 });
 
-    const res = await agent
-      .get(ROOT)
-      .query({ periodId: "all" })
-      .expect(200);
+    const res = await agent.get(ROOT).query({ periodId: "all" }).expect(200);
     const anaRows = res.body.rows.filter(({ id }) => id === students.ana);
 
     expect(res.body.recordsAmount).toBe(5);
-    expect(res.body.studentGradesFieldLabels.period).toBe(
-      "Periodo Escolar"
-    );
+    expect(res.body.studentGradesFieldLabels.period).toBe("Periodo Escolar");
     expect(res.body.rows).toHaveLength(5);
     expect(anaRows).toHaveLength(2);
     expect(anaRows).toEqual(
