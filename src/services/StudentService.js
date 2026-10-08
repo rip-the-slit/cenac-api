@@ -54,7 +54,12 @@ class StudentService {
     const guardianIds = new Map();
 
     for (const row of rawRows) {
-      const key = JSON.stringify([row.id, row.periodId, row.yearId, row.classDatabaseId]);
+      const key = JSON.stringify([
+        row.id,
+        row.periodId,
+        row.yearId,
+        row.classDatabaseId,
+      ]);
       if (!students.has(key)) {
         students.set(key, {
           id: row.id,
@@ -175,11 +180,10 @@ class StudentService {
       includeGuardians: true,
     });
     const enrollments = this._parseStudentRows(rows);
-    const enrollment = enrollments.find(
-      (row) =>
-        row.id === studentId &&
-        String(row.className) !== "z"
-    ) ?? enrollments.find((row) => row.id === studentId);
+    const enrollment =
+      enrollments.find(
+        (row) => row.id === studentId && String(row.className) !== "z"
+      ) ?? enrollments.find((row) => row.id === studentId);
     if (enrollment) {
       student.status = enrollment.status;
       student.assignedGuardians = enrollment.assignedGuardians;
@@ -202,7 +206,12 @@ class StudentService {
     };
   }
 
-  _buildClassSuggestions(students, sourcePeriod, subjectsByYear, subjects = []) {
+  _buildClassSuggestions(
+    students,
+    sourcePeriod,
+    subjectsByYear,
+    subjects = []
+  ) {
     const availableYears = new Set(Object.keys(subjectsByYear).map(Number));
     const enrollmentsByStudent = new Map();
     const regularToCalculate = [];
@@ -236,19 +245,15 @@ class StudentService {
 
     const regularResults = new Map();
     if (regularToCalculate.length > 0) {
-      const regularIds = [
-        ...new Set(regularToCalculate.map(({ id }) => id)),
-      ];
-      const assignments =
-        this.subjectRepository.findAllAssignmentsByPeriod(
-          sourcePeriod.id
-        );
+      const regularIds = [...new Set(regularToCalculate.map(({ id }) => id))];
+      const assignments = this.subjectRepository.findAllAssignmentsByPeriod(
+        sourcePeriod.id
+      );
       const assignmentsByYear = this.gradeService._groupByYear(assignments);
-      const gradeRows =
-        this.subjectRepository.findAllGradesByStudents(
-          sourcePeriod.id,
-          regularIds
-        );
+      const gradeRows = this.subjectRepository.findAllGradesByStudents(
+        sourcePeriod.id,
+        regularIds
+      );
       const rowsToParse = regularToCalculate.map((student) => ({
         ...student,
         subjectAssignments: assignmentsByYear[student.yearId] || [],
@@ -271,12 +276,13 @@ class StudentService {
       }
     }
 
-    const pendingSubjects = floatingIds.size > 0
-      ? this.studentRepository.findAllPendingSubjectsByStudents(
-          sourcePeriod.id,
-          [...floatingIds]
-        )
-      : [];
+    const pendingSubjects =
+      floatingIds.size > 0
+        ? this.studentRepository.findAllPendingSubjectsByStudents(
+            sourcePeriod.id,
+            [...floatingIds]
+          )
+        : [];
     const pendingByEnrollment = new Map();
     for (const subject of pendingSubjects) {
       const key = this.gradeService._enrollmentKey(
@@ -293,15 +299,16 @@ class StudentService {
       const main = regular || floating;
       if (!main) continue;
 
-      const regularResult = regular?.status === "pending"
-        ? regularResults.get(
-            this.gradeService._enrollmentKey(
-              regular.id,
-              regular.periodId,
-              regular.yearId
-            )
-          ) || { status: "failed", subjects: [] }
-        : { status: regular?.status, subjects: [] };
+      const regularResult =
+        regular?.status === "pending"
+          ? regularResults.get(
+              this.gradeService._enrollmentKey(
+                regular.id,
+                regular.periodId,
+                regular.yearId
+              )
+            ) || { status: "failed", subjects: [] }
+          : { status: regular?.status, subjects: [] };
       const floatingRows = floating
         ? pendingByEnrollment.get(
             this.gradeService._enrollmentKey(
@@ -316,14 +323,15 @@ class StudentService {
         .map(({ subjectId }) => subjectId);
       const floatingFailed = Boolean(
         floating &&
-        floating.status !== "passed" &&
-        failedFloatingSubjects.length > 0
+          floating.status !== "passed" &&
+          failedFloatingSubjects.length > 0
       );
       const failedRegularSubjects = regularResult.subjects
         .filter(({ status }) => status === "failed")
         .map(({ subjectId }) => subjectId);
       const currentYear = Number(regular?.yearId ?? floating?.yearId);
       const nextYear = currentYear + 1;
+
       const suggestion = {
         id: main.id,
         firstName: main.firstName,
@@ -338,6 +346,13 @@ class StudentService {
         },
       };
 
+      if (
+        floating &&
+        !regular &&
+        (availableYears.has(nextYear) || !floatingFailed)
+      )
+        continue;
+
       if (floatingFailed) {
         suggestion.pendingSubjects = failedFloatingSubjects;
       } else if (regularResult.status === "passed") {
@@ -345,6 +360,7 @@ class StudentService {
         suggestion._class.year = nextYear;
       } else if (regularResult.status === "pending") {
         if (availableYears.has(nextYear)) suggestion._class.year = nextYear;
+        else suggestion._class.id = "z";
         suggestion.pendingSubjects = failedRegularSubjects;
       }
 
@@ -405,8 +421,6 @@ class StudentService {
       guardianFieldLabels: this.guardianService._getFieldLabels(),
     };
   }
-
-
 }
 
 export default new StudentService(

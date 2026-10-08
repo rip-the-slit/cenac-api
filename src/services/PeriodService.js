@@ -297,13 +297,14 @@ class PeriodService {
           }
         }
 
-        const previousYear = yearId - 1;
+        const floating = student._class?.id === "z";
+        const pendingYear = floating ? yearId : yearId - 1;
         const assignedPendingSubjects = [];
         for (const subjectId of Array.isArray(student.pendingSubjects)
           ? student.pendingSubjects
           : []) {
           const yearSubjectId = yearSubjectMap.get(
-            `${previousYear}-${String(subjectId)}`
+            `${pendingYear}-${String(subjectId)}`
           );
           if (!yearSubjectId) continue;
 
@@ -314,12 +315,12 @@ class PeriodService {
           assignedPendingSubjects.push(subjectId);
         }
 
-        if (assignedPendingSubjects.length > 0) {
+        if (!floating && assignedPendingSubjects.length > 0) {
           expandedStudents.push({
             ...student,
             pendingSubjects: assignedPendingSubjects,
             assignedGuardians: undefined,
-            _class: { id: "z", year: previousYear },
+            _class: { id: "z", year: pendingYear },
           });
         }
       }
