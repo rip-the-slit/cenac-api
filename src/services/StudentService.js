@@ -1,5 +1,4 @@
 import PeriodRepository from "../repositories/PeriodRepository.js";
-import YearRepository from "../repositories/YearRepository.js";
 import StudentRepository from "../repositories/StudentRepository.js";
 import SubjectRepository from "../repositories/SubjectRepository.js";
 import { Period } from "../models/index.js";
@@ -16,7 +15,6 @@ import { getStudentFields } from "./fieldDefinitions.js";
 class StudentService {
   constructor(
     periodRepository,
-    yearRepository,
     studentRepository,
     subjectRepository,
     periodService,
@@ -24,7 +22,6 @@ class StudentService {
     gradeService
   ) {
     this.periodRepository = periodRepository;
-    this.yearRepository = yearRepository;
     this.studentRepository = studentRepository;
     this.subjectRepository = subjectRepository;
     this.periodService = periodService;
@@ -37,17 +34,6 @@ class StudentService {
       throw new Error("Periodo Escolar no registrado");
     }
     return true;
-  }
-
-  // GET /periods/:id/classes -> getClassesByYear(periodId)
-  // Returns { [yearId]: className[] }
-  getClassesByYear(periodId) {
-    if (periodId !== "all") {
-      const period = this.periodRepository.findById(periodId);
-      this.isPeriod(period);
-    }
-
-    return this.periodService.getPeriodFilterData(periodId).classesByYear;
   }
 
   _parseStudentRows(rawRows) {
@@ -405,7 +391,6 @@ class StudentService {
 
 export default new StudentService(
   PeriodRepository,
-  YearRepository,
   StudentRepository,
   SubjectRepository,
   PeriodService,

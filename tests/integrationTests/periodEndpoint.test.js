@@ -123,6 +123,23 @@ describe("Period Endpoint", () => {
     ]);
   });
 
+  test("Returns complete class rows grouped by year", async () => {
+    const res = await agent.get(`${ROOT}/${PERIOD_ID}/classes`).expect(200);
+    const classes = YearRepository.findAllAssignedClassesByPeriod(PERIOD_ID);
+    expect(res.body).toEqual({
+      1: classes.filter(({ yearId }) => yearId === 1),
+      2: classes.filter(({ yearId }) => yearId === 2),
+    });
+    expect(res.body[1][0]).toMatchObject({
+      id: expect.any(Number),
+      name: "A",
+      studentCount: 1,
+      yearPeriodId: expect.any(Number),
+      yearId: 1,
+      periodId: PERIOD_ID,
+    });
+  });
+
   test("Returns the students in the period", async () => {
     const res = await agent
       .get(`${ROOT}/${PERIOD_ID}/students`)
@@ -469,7 +486,7 @@ describe("Period Endpoint", () => {
       .get(`${ROOT}/all/classes`)
       .expect(200);
 
-    expect(res.body[1]).toEqual(["A", "B"]);
-    expect(res.body[2]).toEqual(["C", "D"]);
+    expect(res.body[1].map(({ name }) => name)).toEqual(["A", "B"]);
+    expect(res.body[2].map(({ name }) => name)).toEqual(["C", "D"]);
   });
 });

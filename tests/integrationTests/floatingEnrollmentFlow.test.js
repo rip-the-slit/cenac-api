@@ -65,7 +65,10 @@ describe("Standalone final-year floating enrollment endpoints", () => {
     const classes = await agent
       .get(`/api/periods/${PERIOD_ID}/classes`)
       .expect(200);
-    expect(classes.body).toEqual({ 4: [], 5: ["z"] });
+    expect(classes.body).toEqual({
+      4: [],
+      5: [expect.objectContaining({ name: "z", yearId: 5 })],
+    });
     expect(pendingStatuses()).toEqual([
       { subjectId: 7, yearId: 5, status: "failed" },
       { subjectId: 8, yearId: 5, status: "failed" },

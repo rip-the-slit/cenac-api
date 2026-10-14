@@ -1,10 +1,12 @@
 import PeriodService from "../services/PeriodService.js";
 import StudentService from "../services/StudentService.js";
+import YearService from "../services/YearService.js";
 
 class PeriodController {
-  constructor(periodService, studentService) {
+  constructor(periodService, studentService, yearService) {
     this.periodService = periodService;
     this.studentService = studentService;
+    this.yearService = yearService;
   }
 
   getPeriodList(req, res) {
@@ -27,7 +29,7 @@ class PeriodController {
 
   getClassesByYear(req, res) {
     try {
-      const data = this.studentService.getClassesByYear(req.params.id);
+      const data = this.yearService.getClassesByYear(req.params.id);
       res.json(data);
     } catch (e) {
       res.status(e.status || 500).json({ error: e.message });
@@ -41,6 +43,7 @@ class PeriodController {
         firstName,
         lastName,
         dateOfBirth,
+        birthDate,
         birthPlace,
         year,
         status,
@@ -59,6 +62,7 @@ class PeriodController {
         firstName,
         lastName,
         dateOfBirth,
+        birthDate,
         birthPlace,
         year,
         status,
@@ -148,4 +152,4 @@ class PeriodController {
   }
 }
 
-export default new PeriodController(PeriodService, StudentService);
+export default new PeriodController(PeriodService, StudentService, YearService);

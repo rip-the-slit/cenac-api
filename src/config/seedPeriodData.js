@@ -1,4 +1,5 @@
 const GRADE_SLOTS_PER_TERM = 5;
+const STUDENTS_PER_CLASS = 25;
 
 const FIRST_NAMES = [
   "Adriana", "Alejandro", "Alejandra", "Andrés", "Antonella", "Carlos",
@@ -50,7 +51,7 @@ const guardianId = (yearId, section, position) =>
 
 /** Adds a full Venezuelan secondary-school period when it is not already present. */
 export default function seedPeriodData(db) {
-  const periodId = "2025-2026";
+  const periodId = "2025";
 
   if (db.prepare("SELECT id FROM period WHERE id = ?").get(periodId)) return;
 
@@ -76,10 +77,10 @@ export default function seedPeriodData(db) {
           INSERT INTO class (name, student_count, year_period_id)
           VALUES (?, ?, ?)
         `).run(
-          `Sección ${section === 1 ? "A" : "B"}`, 25, yearPeriodId
+          `${section === 1 ? "A" : "B"}`, STUDENTS_PER_CLASS, yearPeriodId
         ).lastInsertRowid;
 
-        for (let position = 1; position <= 25; position++) {
+        for (let position = 1; position <= STUDENTS_PER_CLASS; position++) {
           const id = studentId(yearId, section, position);
           const lastName = `${randomItem(LAST_NAMES)} ${randomItem(LAST_NAMES)}`;
           db.prepare(`
