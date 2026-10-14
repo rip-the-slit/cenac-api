@@ -1,5 +1,7 @@
 import supertest from "supertest";
+import { Buffer } from "buffer";
 import app from "../../src/app";
+import JSZip from "jszip";
 const agent = supertest.agent(app);
 
 const ROOT = "/api/reports";
@@ -32,6 +34,13 @@ beforeAll(async () => {
     })
     .expect(201);
 
+  await agent.post("/api/guardians").send({
+    id: "V-51000001",
+    firstName: "Maria",
+    lastName: "Alonso",
+    legalRole: "Madre",
+  }).expect(201);
+
   await agent
     .post(`/api/periods/${PERIOD_ID}/load`)
     .send({
@@ -43,6 +52,7 @@ beforeAll(async () => {
           birthDate: "2098-01-01",
           birthPlace: "Caracas",
           _class: { id: "A", year: 1 },
+          assignedGuardians: [{ id: "V-51000001" }],
         },
         {
           id: students.bruno,
@@ -88,6 +98,17 @@ describe("Report Endpoint", () => {
         options: expect.any(Array),
       }),
     ]);
+    expect(res.body).toMatchObject({
+      fields: {
+        q: { label: "Buscar estudiante", type: "text" },
+        year: { type: "select" },
+        class: { type: "select" },
+        status: { type: "select" },
+      },
+      years: expect.any(Array),
+      classesByYear: expect.any(Object),
+      statuses: expect.any(Array),
+    });
   });
 
   test("generates a Word grades report for multiple student ids", async () => {
@@ -95,8 +116,8 @@ describe("Report Endpoint", () => {
       .get(`${ROOT}/grades`)
       .query({
         periodId: PERIOD_ID,
-        q: `${students.ana} OR ${students.bruno} OR ${students.carla}`,
-        term: "all",
+        q: `${students.ana},${students.bruno},${students.carla}`,
+        terms: "all",
       })
       .buffer(true)
       .parse(parseBinary)
@@ -105,5 +126,38 @@ describe("Report Endpoint", () => {
 
     expect(Buffer.isBuffer(res.body)).toBe(true);
     expect(res.body.length).toBeGreaterThan(0);
+    const archive = await JSZip.loadAsync(res.body);
+    const xml = await archive.file("word/document.xml").async("string");
+    for (const id of Object.values(students)) expect(xml).toContain(id);
+  });
+
+  test("combines comma-separated q with student filters for downloads and previews", async () => {
+    for (const preview of ["false", "true"]) {
+      const res = await agent
+        .get(`${ROOT}/grades`)
+        .query({
+          periodId: PERIOD_ID,
+          q: ` ${students.ana}, ${students.bruno},${students.carla} `,
+          firstName: "ana",
+          lastName: "alonso",
+          birthDate: "2098-01",
+          birthPlace: "caracas",
+          guardianQ: "maria alonso",
+          year: 1,
+          class: "A",
+          status: "pending",
+          terms: "2",
+          preview,
+        })
+        .buffer(true)
+        .parse(parseBinary)
+        .expect(200);
+      const archive = await JSZip.loadAsync(res.body);
+      const xml = await archive.file("word/document.xml").async("string");
+      expect(xml).toContain(students.ana);
+      expect(xml).not.toContain(students.bruno);
+      expect(xml).not.toContain(students.carla);
+      expect(xml).toContain("2DO LAPSO");
+    }
   });
 });

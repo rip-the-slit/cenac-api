@@ -99,9 +99,9 @@ describe("Guardian Endpoint", () => {
     const res = await agent.get(ROOT).expect(200);
 
     expect(res.body.recordsAmount).toBe(3);
-    expect(res.body.guardianFieldLabels).toMatchObject({
-      id: expect.any(String),
-      assignedStudents: expect.any(String),
+    expect(res.body.fields).toMatchObject({
+      id: { label: "Cédula", type: "text" },
+      assignedStudents: { label: "Estudiantes Asignados", type: "text" },
     });
     expect(
       res.body.rows.find(({ id }) => id === guardians[0].id).assignedStudents
@@ -166,6 +166,13 @@ describe("Guardian Endpoint", () => {
 
     expect(res.body.guardian).toMatchObject(guardians[0]);
     expect(res.body.guardian.assignedStudents).toHaveLength(2);
+    expect(res.body.fields.legalRole).toMatchObject({
+      label: "Rol Legal",
+      type: "select",
+      required: true,
+      options: expect.arrayContaining([{ value: "Madre", label: "Madre" }]),
+    });
+    expect(res.body).not.toHaveProperty("guardianFieldLabels");
   });
 
   test("allows a coordinator to update guardian fields", async () => {

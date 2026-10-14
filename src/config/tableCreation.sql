@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS guardian (
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
     birth_date DATE,
-    legal_role TEXT NOT NULL,
+    legal_role TEXT NOT NULL CHECK(legal_role IN ("Madre", "Padre", "Representante Legal")),
     phone TEXT,
     address TEXT
 );

@@ -11,6 +11,7 @@ import {
 import PeriodService from "./PeriodService.js";
 import GuardianService from "./GuardianService.js";
 import GradeService from "./GradeService.js";
+import { getStudentFields } from "./fieldDefinitions.js";
 
 class StudentService {
   constructor(
@@ -112,7 +113,7 @@ class StudentService {
       id: normalizeQueryValues(filters.id),
       firstName: normalizeQueryValues(filters.firstName),
       lastName: normalizeQueryValues(filters.lastName),
-      dateOfBirth: normalizeQueryValues(filters.dateOfBirth),
+      dateOfBirth: normalizeQueryValues(filters.birthDate ?? filters.dateOfBirth),
       birthPlace: normalizeQueryValues(filters.birthPlace),
       yearId: normalizeQueryValues(filters.year),
       className: normalizeQueryValues(filters.classId ?? filters.className),
@@ -152,16 +153,7 @@ class StudentService {
       rows,
       recordsAmount,
       ...filterData,
-      studentFieldLabels: {
-        id: "Cédula",
-        firstName: "Nombres",
-        lastName: "Apellidos",
-        birthDate: "Fecha de Nacimiento",
-        birthPlace: "Lugar de Nacimiento",
-        class: periodId === "all" ? "Sección actual" : "Sección",
-        status: periodId === "all" ? "Estatus General" : "Estatus del Periodo",
-        assignedGuardians: "Representantes Asignados",
-      },
+      fields: getStudentFields({ allPeriods: periodId === "all" }),
     };
   }
 
@@ -194,15 +186,7 @@ class StudentService {
 
     return {
       student,
-      studentFieldLabels: {
-        id: "Cédula",
-        firstName: "Nombres",
-        lastName: "Apellidos",
-        birthDate: "Fecha de Nacimiento",
-        birthPlace: "Lugar de Nacimiento",
-        status: periodId === "all" ? "Estatus General" : "Estatus del Periodo",
-        assignedGuardians: "Representantes Asignados",
-      },
+      fields: getStudentFields({ allPeriods: periodId === "all" }),
     };
   }
 
@@ -411,14 +395,10 @@ class StudentService {
         phone: "",
         address: "",
       },
-      studentFieldLabels: {
-        id: "Cédula",
-        firstName: "Nombres",
-        lastName: "Apellidos",
-        birthDate: "Fecha de Nacimiento",
-        birthPlace: "Lugar de Nacimiento",
+      fields: {
+        student: getStudentFields({ editor: true }),
+        guardian: this.guardianService._getFields(),
       },
-      guardianFieldLabels: this.guardianService._getFieldLabels(),
     };
   }
 }

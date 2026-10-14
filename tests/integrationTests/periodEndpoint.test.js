@@ -138,13 +138,13 @@ describe("Period Endpoint", () => {
         { value: "passed", name: "Aprobado" },
         { value: "failed", name: "Reprobado" },
       ],
-      studentFieldLabels: {
-        id: expect.any(String),
-        firstName: expect.any(String),
-        lastName: expect.any(String),
-        birthDate: expect.any(String),
-        birthPlace: expect.any(String),
-        status: expect.any(String),
+      fields: {
+        id: { label: "Cédula", type: "text" },
+        firstName: { label: "Nombres", type: "text" },
+        lastName: { label: "Apellidos", type: "text" },
+        birthDate: { label: "Fecha de Nacimiento", type: "text" },
+        birthPlace: { label: "Lugar de Nacimiento", type: "text" },
+        status: { label: "Estatus del Periodo", type: "select" },
       },
     });
     res.body.rows.forEach((row) =>
@@ -194,6 +194,7 @@ describe("Period Endpoint", () => {
     ],
     ["last name", { lastName: "benitez" }, [students.bruno], 1],
     ["birth date", { dateOfBirth: "2010-09" }, [students.carla], 1],
+    ["birthDate field", { birthDate: "2010-09" }, [students.carla], 1],
     ["birth place", { birthPlace: "maracaibo" }, [students.bruno], 1],
     ["year", { year: 2 }, [students.carla], 1],
     ["class", { class: "B" }, [students.bruno], 1],
@@ -240,7 +241,7 @@ describe("Period Endpoint", () => {
       status: "pending",
       _class: { id: "A", year: 1 },
     });
-    expect(res.body.studentFieldLabels.status).toBe("Estatus del Periodo");
+    expect(res.body.fields.status.label).toBe("Estatus del Periodo");
   });
 
   test("Archives period and starts new one", async () => {
@@ -340,21 +341,26 @@ describe("Period Endpoint", () => {
         phone: "",
         address: "",
       },
-      studentFieldLabels: {
-        id: "Cédula",
-        firstName: "Nombres",
-        lastName: "Apellidos",
-        birthDate: "Fecha de Nacimiento",
-        birthPlace: "Lugar de Nacimiento",
-      },
-      guardianFieldLabels: {
-        id: "Cédula",
-        firstName: "Nombres",
-        lastName: "Apellidos",
-        birthDate: "Fecha de Nacimiento",
-        legalRole: "Rol Legal",
-        phone: "Teléfono",
-        address: "Dirección de Domicilio",
+      fields: {
+        student: {
+          id: { label: "Cédula", type: "text", required: true },
+          firstName: { label: "Nombres", type: "text", required: true, maxLength: 80 },
+          lastName: { label: "Apellidos", type: "text", required: true },
+          birthDate: { label: "Fecha de Nacimiento", type: "date", required: true },
+          birthPlace: { label: "Lugar de Nacimiento", type: "text", required: true },
+        },
+        guardian: {
+          legalRole: {
+            type: "select",
+            required: true,
+            default: "Madre",
+            options: [
+              { value: "Madre", label: "Madre" },
+              { value: "Padre", label: "Padre" },
+              { value: "Representante Legal", label: "Representante Legal" },
+            ],
+          },
+        },
       },
     });
   });
@@ -382,7 +388,7 @@ describe("Period Endpoint", () => {
       .expect(200);
 
     expect(res.body.recordsAmount).toBe(4);
-    expect(res.body.studentFieldLabels.status).toBe("Estatus General");
+    expect(res.body.fields.status.label).toBe("Estatus General");
     expect(res.body.statuses).toEqual([
       { value: "active", name: "Activo" },
       { value: "inactive", name: "Inactivo" },
@@ -450,7 +456,7 @@ describe("Period Endpoint", () => {
       status: "active",
       _class: { id: "C", year: 2 },
     });
-    expect(current.body.studentFieldLabels.status).toBe("Estatus General");
+    expect(current.body.fields.status.label).toBe("Estatus General");
     expect(historical.body.student).toMatchObject({
       id: students.bruno,
       status: "inactive",

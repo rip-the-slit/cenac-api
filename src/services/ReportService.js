@@ -18,6 +18,8 @@ const {
 import fs from "fs";
 import path from "path";
 import GradeService from "./GradeService.js";
+import PeriodService from "./PeriodService.js";
+import { getStudentFields } from "./fieldDefinitions.js";
 
 const INSTITUTION_NAME = "C.E. Juan German Roscio";
 const INSTITUTION_LOGO_PLACEHOLDER = "[LOGO DE LA INSTITUCIÓN]";
@@ -51,12 +53,15 @@ const invisibleBorders = {
 };
 
 class ReportService {
-  constructor(gradeService) {
+  constructor(gradeService, periodService) {
     this.gradeService = gradeService;
+    this.periodService = periodService;
   }
 
-  getReportOptionData() {
+  getReportOptionData(periodId = "all") {
     return {
+      fields: getStudentFields(),
+      ...this.periodService.getPeriodFilterData(periodId),
       reportTypes: [
         {
           value: "grades",
@@ -466,9 +471,10 @@ class ReportService {
     }));
   }
 
-  async generateGradesReport(periodId, q, terms, preview = false) {
+  async generateGradesReport(periodId, q, terms, preview = false, filters = {}) {
     const { rows, subjects, years } = this.gradeService.getGrades(periodId, {
-      q,
+      ...filters,
+      q: q === undefined ? undefined : String(q).split(",").map((value) => value.trim()).filter(Boolean),
       ...(preview ? { page: 1, limit: 5 } : {}),
     });
     const document = new Document({ sections: [] });
@@ -491,4 +497,4 @@ class ReportService {
 
 }
 
-export default new ReportService(GradeService);
+export default new ReportService(GradeService, PeriodService);

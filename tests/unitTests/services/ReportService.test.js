@@ -35,7 +35,11 @@ describe("ReportService", () => {
   };
 
   test("returns the available report options", () => {
-    expect(ReportService.getReportOptionData()).toEqual({
+    expect(ReportService.getReportOptionData()).toMatchObject({
+      fields: { q: { label: "Buscar estudiante", type: "text" } },
+      years: expect.any(Array),
+      classesByYear: expect.any(Object),
+      statuses: expect.any(Array),
       reportTypes: [
         {
           value: "grades",
@@ -129,7 +133,31 @@ describe("ReportService", () => {
 
     try {
       await ReportService.generateGradesReport("2090", "ana", "all", true);
-      expect(receivedFilters).toEqual({ q: "ana", page: 1, limit: 5 });
+      expect(receivedFilters).toEqual({ q: ["ana"], page: 1, limit: 5 });
+    } finally {
+      ReportService.gradeService.getGrades = original;
+    }
+  });
+
+  test("splits report q on commas and forwards the remaining filters", async () => {
+    const original = ReportService.gradeService.getGrades;
+    let receivedFilters;
+    ReportService.gradeService.getGrades = (_periodId, filters) => {
+      receivedFilters = filters;
+      return { rows: [], subjects: [], years: [] };
+    };
+    try {
+      await ReportService.generateGradesReport(
+        "2090", " V-1, , E-2 ", "2", false,
+        { year: "1", class: "A", guardianQ: "Maria", status: "pending" }
+      );
+      expect(receivedFilters).toEqual({
+        q: ["V-1", "E-2"],
+        year: "1",
+        class: "A",
+        guardianQ: "Maria",
+        status: "pending",
+      });
     } finally {
       ReportService.gradeService.getGrades = original;
     }

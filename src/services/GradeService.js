@@ -3,11 +3,13 @@ import PeriodRepository from "../repositories/PeriodRepository.js";
 import StudentRepository from "../repositories/StudentRepository.js";
 import { Grade } from "../models/index.js";
 import {
+  normalizeQueryValue,
   normalizeQueryValues,
   sanitizePagination,
   toNumberOrNull,
 } from "./queryUtils.js";
 import PeriodService from "./PeriodService.js";
+import { getStudentFields } from "./fieldDefinitions.js";
 
 const GRADE_SLOTS_PER_TERM = 5;
 const REVISION_TERM = 4;
@@ -256,10 +258,18 @@ class GradeService {
     }
 
     const sanitizedFilters = {
-      yearId: normalizeQueryValues(filters.yearId),
-      className: normalizeQueryValues(filters.classId),
+      id: normalizeQueryValues(filters.id),
+      firstName: normalizeQueryValues(filters.firstName),
+      lastName: normalizeQueryValues(filters.lastName),
+      dateOfBirth: normalizeQueryValues(filters.birthDate ?? filters.dateOfBirth),
+      birthPlace: normalizeQueryValues(filters.birthPlace),
+      guardianQ: normalizeQueryValues(filters.guardianQ),
+      yearId: normalizeQueryValues(filters.year ?? filters.yearId),
+      className: normalizeQueryValues(filters.class ?? filters.classId),
       status: normalizeQueryValues(filters.status),
-      q: normalizeQueryValues(filters.q),
+      q: Array.isArray(filters.q)
+        ? filters.q.map(normalizeQueryValue).filter(Boolean)
+        : normalizeQueryValues(filters.q),
     };
     const pagination = sanitizePagination(filters);
     const { rows: rawStudentRows, recordsAmount } =
@@ -294,13 +304,12 @@ class GradeService {
         filterData.subjects
       ),
       recordsAmount,
-      studentGradesFieldLabels: {
-        id: "Cédula",
-        period: "Periodo Escolar",
-        fullName: "Nombre Completo",
-        status: "Estatus",
-        class: "Sección",
-        grades: "Notas",
+      fields: {
+        ...getStudentFields(),
+        period: { label: "Periodo Escolar", type: "text" },
+        fullName: { label: "Nombre Completo", type: "text" },
+        status: { label: "Estatus", type: "select" },
+        grades: { label: "Notas", type: "text" },
       },
       ...filterData,
     };

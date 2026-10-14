@@ -115,13 +115,13 @@ describe("Grade Endpoint", () => {
     expect(res.body).toMatchObject({
       rows: expect.any(Array),
       recordsAmount: expect.any(Number),
-      studentGradesFieldLabels: {
-        id: expect.any(String),
-        period: "Periodo Escolar",
-        fullName: expect.any(String),
-        status: expect.any(String),
-        class: expect.any(String),
-        grades: expect.any(String),
+      fields: {
+        id: { label: "Cédula", type: "text" },
+        period: { label: "Periodo Escolar", type: "text" },
+        fullName: { label: "Nombre Completo", type: "text" },
+        status: { label: "Estatus", type: "select" },
+        class: { label: "Sección", type: "select" },
+        grades: { label: "Notas", type: "text" },
       },
       years: expect.any(Array),
       classesByYear: expect.any(Object),
@@ -252,7 +252,7 @@ describe("Grade Endpoint", () => {
     const anaRows = res.body.rows.filter(({ id }) => id === students.ana);
 
     expect(res.body.recordsAmount).toBe(5);
-    expect(res.body.studentGradesFieldLabels.period).toBe("Periodo Escolar");
+    expect(res.body.fields.period.label).toBe("Periodo Escolar");
     expect(res.body.rows).toHaveLength(5);
     expect(anaRows).toHaveLength(2);
     expect(anaRows).toEqual(

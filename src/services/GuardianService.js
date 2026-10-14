@@ -1,5 +1,6 @@
 import { Guardian } from "../models/index.js";
 import GuardianRepository from "../repositories/GuardianRepository.js";
+import { getGuardianFields } from "./fieldDefinitions.js";
 import {
   normalizeQueryValues,
   sanitizePagination,
@@ -10,17 +11,8 @@ class GuardianService {
     this.guardianRepository = guardianRepository;
   }
 
-  _getFieldLabels() {
-    return {
-      id: "Cédula",
-      firstName: "Nombres",
-      lastName: "Apellidos",
-      birthDate: "Fecha de Nacimiento",
-      legalRole: "Rol Legal",
-      phone: "Teléfono",
-      address: "Dirección de Domicilio",
-      assignedStudents: "Estudiantes Asignados",
-    };
+  _getFields(editor = true) {
+    return getGuardianFields({ editor });
   }
 
   _parseGuardianRows(rawRows) {
@@ -92,7 +84,7 @@ class GuardianService {
     return {
       rows: this._parseGuardianRows(rawRows),
       recordsAmount,
-      guardianFieldLabels: this._getFieldLabels(),
+      fields: this._getFields(false),
     };
   }
 
@@ -117,7 +109,7 @@ class GuardianService {
 
     return {
       guardian,
-      guardianFieldLabels: this._getFieldLabels(),
+      fields: this._getFields(),
     };
   }
 

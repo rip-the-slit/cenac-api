@@ -10,7 +10,7 @@ class ReportController {
 
   getReportOptionData(req, res) {
     try {
-      res.json(this.reportService.getReportOptionData());
+      res.json(this.reportService.getReportOptionData(req.query.periodId));
     } catch (e) {
       res.status(e.status || 500).json({ error: e.message });
     }
@@ -27,7 +27,8 @@ class ReportController {
         periodId,
         q,
         terms,
-        preview === "true"
+        preview === "true",
+        req.query
       );
       res.setHeader("Content-Type", WORD_MIME);
       res.setHeader(
