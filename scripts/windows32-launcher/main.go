@@ -108,6 +108,8 @@ func runtimeDir() (string, error) {
 }
 
 func run() error {
+	fmt.Printf("Cargando...")
+
 	runtime, err := runtimeDir()
 	if err != nil {
 		return err
@@ -143,9 +145,10 @@ func run() error {
 			return err
 		}
 	}
+	nodeEnv := append(os.Environ(), "NODE_SKIP_PLATFORM_CHECK=1")
 	command := exec.Command(nodePath, filepath.Join(runtime, "src", "app.js"))
 	command.Dir = workingDir
-	command.Env = os.Environ()
+	command.Env = nodeEnv
 	command.Stdin = os.Stdin
 	logPath := filepath.Join(workingDir, "cenac-api.log")
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
@@ -154,13 +157,22 @@ func run() error {
 	}
 	defer logFile.Close()
 	fmt.Fprintf(logFile, "\n--- %s ---\n", time.Now().Format(time.RFC3339))
-	version, versionErr := exec.Command(nodePath, "--version").Output()
+	versionCommand := exec.Command(nodePath, "--version")
+	versionCommand.Env = nodeEnv
+	version, versionErr := versionCommand.Output()
 	if versionErr != nil {
 		return fmt.Errorf("could not run %s: %w", nodePath, versionErr)
 	}
 	fmt.Fprintf(logFile, "Node: %s (%s)\n", nodePath, strings.TrimSpace(string(version)))
 	command.Stdout = io.MultiWriter(os.Stdout, logFile)
 	command.Stderr = io.MultiWriter(os.Stderr, logFile)
+	clearCommand := exec.Command("cmd.exe", "/d", "/c", "cls")
+	clearCommand.Stdin = os.Stdin
+	clearCommand.Stdout = os.Stdout
+	clearCommand.Stderr = os.Stderr
+	if err := clearCommand.Run(); err != nil {
+		fmt.Fprintf(logFile, "Could not clear terminal: %v\n", err)
+	}
 	if err := command.Run(); err != nil {
 		fmt.Fprintf(logFile, "Server exited: %v\n", err)
 		return fmt.Errorf("server exited; see %s: %w", logPath, err)
