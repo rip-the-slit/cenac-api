@@ -16,10 +16,10 @@ const {
   WidthType,
 } = docx.default ?? docx;
 import fs from "fs";
-import path from "path";
 import GradeService from "./GradeService.js";
 import PeriodService from "./PeriodService.js";
 import { getStudentFields } from "./fieldDefinitions.js";
+import getRelativeFilePath from "../config/getRelativeFilePath.js";
 
 const INSTITUTION_NAME = "C.E. Juan German Roscio";
 const INSTITUTION_LOGO_PLACEHOLDER = "[LOGO DE LA INSTITUCIÓN]";
@@ -162,13 +162,13 @@ class ReportService {
       : gradeRecord.class;
     const academicPeriod = gradeRecord.period + " - " + (Number(gradeRecord.period) + 1);
 
-    const logoPath = path.resolve("public/logo.jpg");
+    const logoPath = getRelativeFilePath(import.meta.url, "../../public/logo.jpg");
     const logoParagraph = fs.existsSync(logoPath)
       ? new Paragraph({
           alignment: AlignmentType.CENTER,
           children: [
             new ImageRun({
-              type: "png",
+              type: "jpg",
               data: fs.readFileSync(logoPath),
               transformation: { width: 120, height: 120 },
               altText: {
