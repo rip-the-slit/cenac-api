@@ -3,6 +3,7 @@ import { configDotenv } from "dotenv";
 import open from "open";
 import router from "./routes/index.js";
 import getRelativeFilePath from "./config/getRelativeFilePath.js";
+import db from "./config/db.js";
 
 configDotenv({quiet: true})
 const isTesting = process.env.NODE_ENV === "test";
@@ -35,8 +36,12 @@ if (!isTesting) {
   });
   server.on("error", (error) => {
     console.error(`No se logró iniciar Cenac JGR: ${error.message}`);
+    db.close();
     process.exitCode = 1;
   });
+  server.once("close", () => db.close());
+  process.once("SIGINT", () => server.close());
+  process.once("SIGTERM", () => server.close());
 }
 
 export default app;

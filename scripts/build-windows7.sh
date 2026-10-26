@@ -32,10 +32,19 @@ go_bin="$build_dir/toolchain/go/bin/go"
 cp "$project_dir/package.json" "$project_dir/package-lock.json" "$build_dir/stage/"
 cp -a "$project_dir/src" "$project_dir/public" "$build_dir/stage/"
 unzip -j -q "$node_archive" '*/node.exe' -d "$build_dir/stage"
-npm --prefix "$build_dir/stage" ci --omit=dev --ignore-scripts --no-audit --no-fund
+npm --prefix "$build_dir/stage" ci --omit=dev --omit=optional --ignore-scripts --no-audit --no-fund
 
-if [[ -n "$(find "$build_dir/stage/node_modules" -type f \( -name '*.node' -o -name '*.so' \) -print -quit)" ]]; then
-  echo 'The production dependencies contain platform-specific native modules.' >&2
+# Ship the exact Node-API x86 addon tested on Win7; never compile on the target.
+sqlite_archive="$build_dir/sqlite3-v5.1.7-napi-v6-win32-ia32.tar.gz"
+curl -fsSL --retry 3 -o "$sqlite_archive" \
+  https://github.com/TryGhost/node-sqlite3/releases/download/v5.1.7/sqlite3-v5.1.7-napi-v6-win32-ia32.tar.gz
+printf '%s  %s\n' '8cd346d2341f4dbda30a2b592656ea14290d86d70608585628256ba4e89153a3' "$sqlite_archive" | sha256sum -c -
+tar -xzf "$sqlite_archive" -C "$build_dir/stage/node_modules/sqlite3" build/Release/node_sqlite3.node
+
+expected_addon="$build_dir/stage/node_modules/sqlite3/build/Release/node_sqlite3.node"
+test -s "$expected_addon"
+if [[ -n "$(find "$build_dir/stage/node_modules" -type f \( -name '*.node' -o -name '*.so' \) ! -path "$expected_addon" -print -quit)" ]]; then
+  echo 'The production dependencies contain unexpected native modules.' >&2
   exit 1
 fi
 
