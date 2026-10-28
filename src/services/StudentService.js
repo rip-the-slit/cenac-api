@@ -1,6 +1,7 @@
 import PeriodRepository from "../repositories/PeriodRepository.js";
 import StudentRepository from "../repositories/StudentRepository.js";
 import SubjectRepository from "../repositories/SubjectRepository.js";
+import PlaceRepository from "../repositories/PlaceRepository.js";
 import { Period } from "../models/index.js";
 import {
   normalizeQueryValue,
@@ -19,7 +20,8 @@ class StudentService {
     subjectRepository,
     periodService,
     guardianService,
-    gradeService
+    gradeService,
+    placeRepository
   ) {
     this.periodRepository = periodRepository;
     this.studentRepository = studentRepository;
@@ -27,6 +29,27 @@ class StudentService {
     this.periodService = periodService;
     this.guardianService = guardianService;
     this.gradeService = gradeService;
+    this.placeRepository = placeRepository;
+  }
+
+  getPlaces(filters = {}) {
+    const type = normalizeQueryValue(filters.type);
+    const country = normalizeQueryValue(filters.country);
+    const state = normalizeQueryValue(filters.state);
+    const q = normalizeQueryValue(filters.q);
+    const methods = {
+      country: "findAllCountries",
+      state: "findAllStates",
+      municipality: "findAllMunicipalities",
+    };
+    if (!Object.prototype.hasOwnProperty.call(methods, type) ||
+        (type !== "country" && !country) ||
+        (type === "municipality" && (!state || !/^\d+$/.test(state)))) {
+      const error = new Error("Indique un tipo de lugar válido, el país para estados y municipios, y el ID del estado para municipios");
+      error.status = 400;
+      throw error;
+    }
+    return this.placeRepository[methods[type]]({ country, state, q }, sanitizePagination(filters));
   }
 
   isPeriod(period) {
@@ -395,5 +418,6 @@ export default new StudentService(
   SubjectRepository,
   PeriodService,
   GuardianService,
-  GradeService
+  GradeService,
+  PlaceRepository
 );

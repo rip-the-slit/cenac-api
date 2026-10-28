@@ -69,6 +69,30 @@ beforeAll(async () => {
 });
 
 describe("Period Endpoint", () => {
+  test("Finds countries, states and municipalities by name and parent place", async () => {
+    const countries = await agent.get(`${ROOT}/places`)
+      .query({ type: "country", q: "Venezuela" }).expect(200);
+    expect(countries.body.rows).toEqual([
+      expect.objectContaining({ iso2: "VE", name: "Venezuela" }),
+    ]);
+    expect(countries.body.recordsAmount).toBe(1);
+
+    const states = await agent.get(`${ROOT}/places`)
+      .query({ type: "state", country: "VE", q: "Miranda" }).expect(200);
+    expect(states.body.rows).toEqual([
+      expect.objectContaining({ id: expect.any(Number), country: "VE", name: "Miranda" }),
+    ]);
+
+    const state = states.body.rows[0].id;
+    const municipalities = await agent.get(`${ROOT}/places`)
+      .query({ type: "municipality", country: "VE", state, q: "Sucre" }).expect(200);
+    expect(municipalities.body.recordsAmount).toBeGreaterThan(0);
+    expect(municipalities.body.rows.length).toBe(municipalities.body.recordsAmount);
+    for (const municipality of municipalities.body.rows) {
+      expect(municipality).toMatchObject({ country: "VE", state, name: expect.stringMatching(/sucre/i) });
+    }
+  });
+
   test("Root returns empty object", async () => {
     const res = await agent.get(ROOT).expect(200);
 

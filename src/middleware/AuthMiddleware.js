@@ -13,7 +13,7 @@ class AuthMiddleware {
     if (!token) {
       return res
         .status(401)
-        .json({ message: "Acceso denegado. No se proporcionó un token." });
+        .json({ message: "Acceso denegado. Su sesión ha caducado." });
     }
 
     try {

@@ -31,6 +31,7 @@ go_bin="$build_dir/toolchain/go/bin/go"
 
 cp "$project_dir/package.json" "$project_dir/package-lock.json" "$build_dir/stage/"
 cp -a "$project_dir/src" "$project_dir/public" "$build_dir/stage/"
+cp "$project_dir/geonames-full.db" "$build_dir/stage/"
 unzip -j -q "$node_archive" '*/node.exe' -d "$build_dir/stage"
 npm --prefix "$build_dir/stage" ci --omit=dev --omit=optional --ignore-scripts --no-audit --no-fund
 
@@ -50,7 +51,7 @@ fi
 
 tar -czf "$build_dir/launcher/payload.tar.gz" \
   --exclude='node_modules/.bin' \
-  -C "$build_dir/stage" node.exe src public node_modules package.json
+  -C "$build_dir/stage" node.exe src public node_modules package.json geonames-full.db
 cp "$project_dir/scripts/windows32-launcher/main.go" "$build_dir/launcher/main.go"
 
 GOBIN="$build_dir/bin" GOPATH="$build_dir/gopath" \

@@ -33,7 +33,7 @@ class ReportController {
       res.setHeader("Content-Type", WORD_MIME);
       res.setHeader(
         "Content-Disposition",
-        'attachment; filename="grades-report.docx"'
+        'attachment;'
       );
       res.end(buffer);
     } catch (e) {

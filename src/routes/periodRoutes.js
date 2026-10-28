@@ -6,6 +6,7 @@ const router = Router();
 
 router.get("/", (req, res) => PeriodController.getPeriodList(req, res));
 router.get("/suggestions", (req, res) => PeriodController.getClassSuggestions(req, res));
+router.get("/places", (req, res) => PeriodController.getPlaces(req, res));
 router.get("/:id", (req, res) => PeriodController.getPeriodStats(req, res));
 router.get("/:id/classes", (req, res) => PeriodController.getClassesByYear(req, res));
 router.get("/:id/students", (req, res) => PeriodController.getStudentsByPeriod(req, res));
