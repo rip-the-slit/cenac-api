@@ -18,6 +18,14 @@ class PeriodController {
     }
   }
 
+  updateStudent(req, res) {
+    try {
+      res.json(this.studentService.updateStudent(req.params.studentId, req.body));
+    } catch (e) {
+      res.status(e.status || 500).json({ error: e.message });
+    }
+  }
+
   getPlaces(req, res) {
     try {
       res.json(this.studentService.getPlaces(req.query));

@@ -2,7 +2,8 @@ import PeriodRepository from "../repositories/PeriodRepository.js";
 import StudentRepository from "../repositories/StudentRepository.js";
 import SubjectRepository from "../repositories/SubjectRepository.js";
 import PlaceRepository from "../repositories/PlaceRepository.js";
-import { Period } from "../models/index.js";
+import GuardianRepository from "../repositories/GuardianRepository.js";
+import { Period, Student } from "../models/index.js";
 import {
   normalizeQueryValue,
   normalizeQueryValues,
@@ -11,7 +12,7 @@ import {
 import PeriodService from "./PeriodService.js";
 import GuardianService from "./GuardianService.js";
 import GradeService from "./GradeService.js";
-import { getStudentFields } from "./fieldDefinitions.js";
+import { getGuardianFields, getStudentFields } from "./fieldDefinitions.js";
 
 class StudentService {
   constructor(
@@ -21,7 +22,8 @@ class StudentService {
     periodService,
     guardianService,
     gradeService,
-    placeRepository
+    placeRepository,
+    guardianRepository
   ) {
     this.periodRepository = periodRepository;
     this.studentRepository = studentRepository;
@@ -30,6 +32,69 @@ class StudentService {
     this.guardianService = guardianService;
     this.gradeService = gradeService;
     this.placeRepository = placeRepository;
+    this.guardianRepository = guardianRepository;
+  }
+
+  updateStudent(id, studentData = {}) {
+    const current = this.studentRepository.findById(id);
+    if (!current) {
+      const error = new Error("Estudiante no registrado");
+      error.status = 404;
+      throw error;
+    }
+    const student = new Student(
+      id,
+      studentData.firstName ?? current.firstName,
+      studentData.lastName ?? current.lastName,
+      studentData.birthDate ?? current.birthDate,
+      studentData.birthPlace ?? current.birthPlace,
+      studentData.status ?? current.status
+    );
+    if (
+      !student.firstName ||
+      !student.lastName ||
+      !["active", "inactive"].includes(student.status)
+    ) {
+      const error = new Error(
+        "Los nombres, apellidos y un estatus válido son requeridos"
+      );
+      error.status = 400;
+      throw error;
+    }
+    const syncGuardians = Object.prototype.hasOwnProperty.call(
+      studentData,
+      "assignedGuardians"
+    );
+    if (syncGuardians) {
+      if (!Array.isArray(studentData.assignedGuardians)) {
+        const error = new Error(
+          "Los representantes asignados deben ser un arreglo"
+        );
+        error.status = 400;
+        throw error;
+      }
+      for (const guardian of studentData.assignedGuardians) {
+        if (!guardian?.id || !this.guardianRepository.findById(guardian.id)) {
+          const error = new Error(
+            `Representante no registrado: ${guardian?.id ?? "sin cédula"}`
+          );
+          error.status = 400;
+          throw error;
+        }
+      }
+    }
+    return this.studentRepository.db.transaction(() => {
+      this.studentRepository.update(id, student);
+      if (syncGuardians) {
+        this.studentRepository.syncAssignedGuardians(
+          id,
+          studentData.assignedGuardians.map(({ id: guardianId }) => guardianId)
+        );
+      }
+      student.assignedGuardians =
+        this.studentRepository.findAllAssignedGuardians(id);
+      return student;
+    });
   }
 
   getPlaces(filters = {}) {
@@ -42,14 +107,21 @@ class StudentService {
       state: "findAllStates",
       municipality: "findAllMunicipalities",
     };
-    if (!Object.prototype.hasOwnProperty.call(methods, type) ||
-        (type !== "country" && !country) ||
-        (type === "municipality" && (!state || !/^\d+$/.test(state)))) {
-      const error = new Error("Indique un tipo de lugar válido, el país para estados y municipios, y el ID del estado para municipios");
+    if (
+      !Object.prototype.hasOwnProperty.call(methods, type) ||
+      (type !== "country" && !country) ||
+      (type === "municipality" && (!state || !/^\d+$/.test(state)))
+    ) {
+      const error = new Error(
+        "Indique un tipo de lugar válido, el país para estados y municipios, y el ID del estado para municipios"
+      );
       error.status = 400;
       throw error;
     }
-    return this.placeRepository[methods[type]]({ country, state, q }, sanitizePagination(filters));
+    return this.placeRepository[methods[type]](
+      { country, state, q },
+      sanitizePagination(filters)
+    );
   }
 
   isPeriod(period) {
@@ -122,7 +194,9 @@ class StudentService {
       id: normalizeQueryValues(filters.id),
       firstName: normalizeQueryValues(filters.firstName),
       lastName: normalizeQueryValues(filters.lastName),
-      dateOfBirth: normalizeQueryValues(filters.birthDate ?? filters.dateOfBirth),
+      dateOfBirth: normalizeQueryValues(
+        filters.birthDate ?? filters.dateOfBirth
+      ),
       birthPlace: normalizeQueryValues(filters.birthPlace),
       yearId: normalizeQueryValues(filters.year),
       className: normalizeQueryValues(filters.classId ?? filters.className),
@@ -195,7 +269,10 @@ class StudentService {
 
     return {
       student,
-      fields: getStudentFields({ allPeriods: periodId === "all" }),
+      fields: {
+        student: getStudentFields({ allPeriods: periodId === "all", editor: true }),
+        guardian: getGuardianFields(),
+      },
     };
   }
 
@@ -406,7 +483,7 @@ class StudentService {
       },
       fields: {
         student: getStudentFields({ editor: true }),
-        guardian: this.guardianService._getFields(),
+        guardian: getGuardianFields(),
       },
     };
   }
@@ -419,5 +496,6 @@ export default new StudentService(
   PeriodService,
   GuardianService,
   GradeService,
-  PlaceRepository
+  PlaceRepository,
+  GuardianRepository
 );

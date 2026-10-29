@@ -16,5 +16,6 @@ router.use((req, res, next) => AuthMiddleware.checkRole("Administrador", "Coordi
 router.post("/", (req, res) => PeriodController.addPeriod(req, res))
 router.post("/:id/load", (req, res) => PeriodController.loadPeriodData(req, res));
 router.post("/:id/archive", (req, res) => PeriodController.archivePeriod(req, res));
+router.post("/:id/students/:studentId/edit", (req, res) => PeriodController.updateStudent(req, res));
 
 export default router;

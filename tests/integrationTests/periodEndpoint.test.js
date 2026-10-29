@@ -70,26 +70,42 @@ beforeAll(async () => {
 
 describe("Period Endpoint", () => {
   test("Finds countries, states and municipalities by name and parent place", async () => {
-    const countries = await agent.get(`${ROOT}/places`)
-      .query({ type: "country", q: "Venezuela" }).expect(200);
+    const countries = await agent
+      .get(`${ROOT}/places`)
+      .query({ type: "country", q: "Venezuela" })
+      .expect(200);
     expect(countries.body.rows).toEqual([
       expect.objectContaining({ iso2: "VE", name: "Venezuela" }),
     ]);
     expect(countries.body.recordsAmount).toBe(1);
 
-    const states = await agent.get(`${ROOT}/places`)
-      .query({ type: "state", country: "VE", q: "Miranda" }).expect(200);
+    const states = await agent
+      .get(`${ROOT}/places`)
+      .query({ type: "state", country: "VE", q: "Miranda" })
+      .expect(200);
     expect(states.body.rows).toEqual([
-      expect.objectContaining({ id: expect.any(Number), country: "VE", name: "Miranda" }),
+      expect.objectContaining({
+        id: expect.any(Number),
+        country: "VE",
+        name: "Miranda",
+      }),
     ]);
 
     const state = states.body.rows[0].id;
-    const municipalities = await agent.get(`${ROOT}/places`)
-      .query({ type: "municipality", country: "VE", state, q: "Sucre" }).expect(200);
+    const municipalities = await agent
+      .get(`${ROOT}/places`)
+      .query({ type: "municipality", country: "VE", state, q: "Sucre" })
+      .expect(200);
     expect(municipalities.body.recordsAmount).toBeGreaterThan(0);
-    expect(municipalities.body.rows.length).toBe(municipalities.body.recordsAmount);
+    expect(municipalities.body.rows.length).toBe(
+      municipalities.body.recordsAmount
+    );
     for (const municipality of municipalities.body.rows) {
-      expect(municipality).toMatchObject({ country: "VE", state, name: expect.stringMatching(/sucre/i) });
+      expect(municipality).toMatchObject({
+        country: "VE",
+        state,
+        name: expect.stringMatching(/sucre/i),
+      });
     }
   });
 
@@ -165,9 +181,7 @@ describe("Period Endpoint", () => {
   });
 
   test("Returns the students in the period", async () => {
-    const res = await agent
-      .get(`${ROOT}/${PERIOD_ID}/students`)
-      .expect(200);
+    const res = await agent.get(`${ROOT}/${PERIOD_ID}/students`).expect(200);
 
     expect(res.body).toMatchObject({
       rows: expect.any(Array),
@@ -282,7 +296,7 @@ describe("Period Endpoint", () => {
       status: "pending",
       _class: { id: "A", year: 1 },
     });
-    expect(res.body.fields.status.label).toBe("Estatus del Periodo");
+    expect(res.body.fields.student.status.label).toBe("Estatus del Periodo");
   });
 
   test("Archives period and starts new one", async () => {
@@ -333,7 +347,6 @@ describe("Period Endpoint", () => {
         subjects: { 2: [] },
       })
       .expect(200, { loaded: true });
-
   });
 
   test("Returns suggestions only for students with an available next year", async () => {
@@ -354,9 +367,7 @@ describe("Period Endpoint", () => {
       }),
     ]);
     expect(res.body.students).not.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: students.carla }),
-      ])
+      expect.arrayContaining([expect.objectContaining({ id: students.carla })])
     );
   });
 
@@ -385,10 +396,23 @@ describe("Period Endpoint", () => {
       fields: {
         student: {
           id: { label: "Cédula", type: "text", required: true },
-          firstName: { label: "Nombres", type: "text", required: true, maxLength: 80 },
+          firstName: {
+            label: "Nombres",
+            type: "text",
+            required: true,
+            maxLength: 80,
+          },
           lastName: { label: "Apellidos", type: "text", required: true },
-          birthDate: { label: "Fecha de Nacimiento", type: "date", required: true },
-          birthPlace: { label: "Lugar de Nacimiento", type: "text", required: true },
+          birthDate: {
+            label: "Fecha de Nacimiento",
+            type: "date",
+            required: true,
+          },
+          birthPlace: {
+            label: "Lugar de Nacimiento",
+            type: "text",
+            required: true,
+          },
         },
         guardian: {
           legalRole: {
@@ -424,9 +448,7 @@ describe("Period Endpoint", () => {
   });
 
   test("Returns unique students with class data from the loaded period", async () => {
-    const res = await agent
-      .get(`${ROOT}/all/students`)
-      .expect(200);
+    const res = await agent.get(`${ROOT}/all/students`).expect(200);
 
     expect(res.body.recordsAmount).toBe(4);
     expect(res.body.fields.status.label).toBe("Estatus General");
@@ -497,7 +519,7 @@ describe("Period Endpoint", () => {
       status: "active",
       _class: { id: "C", year: 2 },
     });
-    expect(current.body.fields.status.label).toBe("Estatus General");
+    expect(current.body.fields.student.status.label).toBe("Estatus General");
     expect(historical.body.student).toMatchObject({
       id: students.bruno,
       status: "inactive",
@@ -505,10 +527,36 @@ describe("Period Endpoint", () => {
     });
   });
 
-  test("Returns the largest class list found for each year", async () => {
-    const res = await agent
-      .get(`${ROOT}/all/classes`)
+  test("Allows a coordinator to update student fields", async () => {
+    const coordinator = supertest.agent(app);
+    await coordinator
+      .post("/api/users/login")
+      .send({ id: 2, password: "1234" })
       .expect(200);
+
+    const fields = {
+      firstName: "Carolina",
+      lastName: "Perez",
+      birthDate: "2010-10-20",
+      birthPlace: "Maracay",
+    };
+    const updated = await coordinator
+      .post(`${ROOT}/${PERIOD_ID}/students/${students.carla}/edit`)
+      .send(fields)
+      .expect(200);
+    expect(updated.body).toMatchObject({ id: students.carla, ...fields });
+
+    const detail = await coordinator
+      .get(`${ROOT}/${PERIOD_ID}/students/${students.carla}`)
+      .expect(200);
+    expect(detail.body.student).toMatchObject({
+      id: students.carla,
+      ...fields,
+    });
+  });
+
+  test("Returns the largest class list found for each year", async () => {
+    const res = await agent.get(`${ROOT}/all/classes`).expect(200);
 
     expect(res.body[1].map(({ name }) => name)).toEqual(["A", "B"]);
     expect(res.body[2].map(({ name }) => name)).toEqual(["C", "D"]);

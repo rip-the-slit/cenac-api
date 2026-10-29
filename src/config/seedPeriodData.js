@@ -17,9 +17,14 @@ const LAST_NAMES = [
 ];
 
 const BIRTH_PLACES = [
-  "Caracas, Distrito Capital", "Maracay, Aragua", "Valencia, Carabobo",
-  "Barquisimeto, Lara", "Maracaibo, Zulia", "Maturín, Monagas",
-  "Puerto La Cruz, Anzoátegui", "San Cristóbal, Táchira",
+  "Venezuela, Distrito Capital, Libertador",
+  "Venezuela, Aragua, Girardot",
+  "Venezuela, Carabobo, Valencia",
+  "Venezuela, Lara, Iribarren",
+  "Venezuela, Zulia, Maracaibo",
+  "Venezuela, Monagas, Maturín",
+  "Venezuela, Anzoátegui, Juan Antonio Sotillo",
+  "Venezuela, Táchira, San Cristóbal",
 ];
 
 
