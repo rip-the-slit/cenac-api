@@ -139,6 +139,19 @@ describe("ReportService", () => {
     }
   });
 
+  test("generates a document with a message when no grades match", async () => {
+    const original = ReportService.gradeService.getGrades;
+    ReportService.gradeService.getGrades = () => ({ rows: [], subjects: [], years: [] });
+    try {
+      const buffer = await ReportService.generateGradesReport("2090", "missing", "all");
+      const archive = await JSZip.loadAsync(buffer);
+      const xml = await archive.file("word/document.xml").async("string");
+      expect(xml).toContain("No se encontraron resultados para la consulta.");
+    } finally {
+      ReportService.gradeService.getGrades = original;
+    }
+  });
+
   test("splits report q on commas and forwards the remaining filters", async () => {
     const original = ReportService.gradeService.getGrades;
     let receivedFilters;

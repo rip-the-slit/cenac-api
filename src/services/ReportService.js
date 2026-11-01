@@ -111,7 +111,7 @@ class ReportService {
           }),
         ],
       });
-    
+
     const reportCell = (
       text,
       {
@@ -129,17 +129,16 @@ class ReportService {
         borders,
         columnSpan,
         rowSpan,
-        width: width
-          ? { size: width, type: WidthType.PERCENTAGE }
-          : undefined,
+        width: width ? { size: width, type: WidthType.PERCENTAGE } : undefined,
         verticalAlign: VerticalAlign.CENTER,
         margins: { top: 40, bottom: 40, left: 100, right: 100 },
-        children:
-          children || [textParagraph(text, { bold, size, alignment })],
+        children: children || [textParagraph(text, { bold, size, alignment })],
       });
-    
+
     const displayGrade = (value) =>
-      value === null || value === undefined ? "" : String(Math.trunc(value * 10) / 10).replace(".", ",");  
+      value === null || value === undefined
+        ? ""
+        : String(Math.trunc(value * 10) / 10).replace(".", ",");
 
     const selectedTerm = ["1", "2", "3"].includes(String(terms))
       ? String(terms)
@@ -148,11 +147,12 @@ class ReportService {
     const subjectNames = new Map(
       subjects.map((subject) => [String(subject.id), subject.name])
     );
-    const assignedSubjects = Object.entries(gradeRecord.subjectDetails || {})
-      .map(([subjectId, grades]) => ({
-        name: subjectNames.get(String(subjectId)) || String(subjectId),
-        grades,
-      }));
+    const assignedSubjects = Object.entries(
+      gradeRecord.subjectDetails || {}
+    ).map(([subjectId, grades]) => ({
+      name: subjectNames.get(String(subjectId)) || String(subjectId),
+      grades,
+    }));
     const matchingYear = [...years]
       .sort((first, second) => second.name.length - first.name.length)
       .find((year) => gradeRecord.class.startsWith(year.name));
@@ -160,9 +160,13 @@ class ReportService {
     const sectionName = matchingYear
       ? gradeRecord.class.slice(matchingYear.name.length).trim()
       : gradeRecord.class;
-    const academicPeriod = gradeRecord.period + " - " + (Number(gradeRecord.period) + 1);
+    const academicPeriod =
+      gradeRecord.period + " - " + (Number(gradeRecord.period) + 1);
 
-    const logoPath = getRelativeFilePath(import.meta.url, "../../public/logo.jpg");
+    const logoPath = getRelativeFilePath(
+      import.meta.url,
+      "../../public/logo.jpg"
+    );
     const logoParagraph = fs.existsSync(logoPath)
       ? new Paragraph({
           alignment: AlignmentType.CENTER,
@@ -284,18 +288,21 @@ class ReportService {
           ]),
         }),
       ];
-      studentGradeRows = assignedSubjects.map(({ name, grades }) =>
-        new TableRow({
-          children: [
-            reportCell(name, { alignment: AlignmentType.LEFT }),
-            ...grades.termAverages.slice(0, 3).flatMap((average) => [
-              reportCell(displayGrade(average)),
+      studentGradeRows = assignedSubjects.map(
+        ({ name, grades }) =>
+          new TableRow({
+            children: [
+              reportCell(name, { alignment: AlignmentType.LEFT }),
+              ...grades.termAverages
+                .slice(0, 3)
+                .flatMap((average) => [
+                  reportCell(displayGrade(average)),
+                  reportCell(""),
+                ]),
+              reportCell(displayGrade(grades.avg), { bold: true }),
               reportCell(""),
-            ]),
-            reportCell(displayGrade(grades.avg), { bold: true }),
-            reportCell(""),
-          ],
-        })
+            ],
+          })
       );
     } else {
       const termIndex = Number(selectedTerm) - 1;
@@ -325,18 +332,19 @@ class ReportService {
           ),
         }),
       ];
-      studentGradeRows = assignedSubjects.map(({ name, grades }) =>
-        new TableRow({
-          children: [
-            reportCell(name, { alignment: AlignmentType.LEFT }),
-            ...grades.terms[termIndex].map((grade) =>
-              reportCell(displayGrade(grade))
-            ),
-            reportCell(displayGrade(grades.termAverages[termIndex]), {
-              bold: true,
-            }),
-          ],
-        })
+      studentGradeRows = assignedSubjects.map(
+        ({ name, grades }) =>
+          new TableRow({
+            children: [
+              reportCell(name, { alignment: AlignmentType.LEFT }),
+              ...grades.terms[termIndex].map((grade) =>
+                reportCell(displayGrade(grade))
+              ),
+              reportCell(displayGrade(grades.termAverages[termIndex]), {
+                bold: true,
+              }),
+            ],
+          })
       );
     }
 
@@ -361,9 +369,7 @@ class ReportService {
             alignment: AlignmentType.LEFT,
           }),
           ...Array.from({ length: 4 }, (_, termIndex) =>
-            reportCell(
-              displayGrade(pending?.grades?.termAverages?.[termIndex])
-            )
+            reportCell(displayGrade(pending?.grades?.termAverages?.[termIndex]))
           ),
         ],
       });
@@ -399,7 +405,7 @@ class ReportService {
     const observations = reportCell("", {
       width: 75,
       alignment: AlignmentType.LEFT,
-      borders: {...visibleBorders, top: invisibleBorders.top},
+      borders: { ...visibleBorders, top: invisibleBorders.top },
       children: [
         textParagraph("OBSERVACIONES:", { bold: true }),
         textParagraph(""),
@@ -471,30 +477,66 @@ class ReportService {
     }));
   }
 
-  async generateGradesReport(periodId, q, terms, preview = false, filters = {}) {
+  generateEmptyReport() {
+    const document = new Document({
+      sections: [
+        {
+          properties: {
+            page: {
+              margin: {
+                top: PAGE_MARGIN,
+                bottom: PAGE_MARGIN,
+                left: PAGE_MARGIN,
+                right: PAGE_MARGIN,
+              },
+            },
+          },
+          children: [
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "No se encontraron resultados para la consulta.",
+                  size: BODY_FONT_SIZE * 1.5,
+                }),
+              ],
+            }),
+          ],
+        },
+      ],
+    });
+    return Packer.toBuffer(document);
+  }
+
+  async generateGradesReport(
+    periodId,
+    q,
+    terms,
+    preview = false,
+    filters = {}
+  ) {
     const { rows, subjects, years } = this.gradeService.getGrades(periodId, {
       ...filters,
-      q: q === undefined ? undefined : String(q).split(",").map((value) => value.trim()).filter(Boolean),
+      q:
+        q === undefined
+          ? undefined
+          : String(q)
+              .split(",")
+              .map((value) => value.trim())
+              .filter(Boolean),
       ...(preview ? { page: 1, limit: 5 } : {}),
     });
+    if (rows.length === 0) return this.generateEmptyReport();
     const document = new Document({ sections: [] });
     const reportDate = this._formatReportDate(new Date());
 
     for (const gradeRecord of this._mergeFloatingEnrollments(rows)) {
       document.addSection(
-        this._buildGradesReport(
-          gradeRecord,
-          terms,
-          subjects,
-          years,
-          reportDate
-        )
+        this._buildGradesReport(gradeRecord, terms, subjects, years, reportDate)
       );
     }
 
     return Packer.toBuffer(document);
   }
-
 }
 
 export default new ReportService(GradeService, PeriodService);
