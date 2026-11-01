@@ -1,6 +1,8 @@
 import db from "../config/db.js";
 import { Period } from "../models/index.js";
 
+const GRADE_SLOTS_PER_TERM = 5;
+
 class PeriodRepository {
   constructor(db) {
     this.db = db;
@@ -99,16 +101,39 @@ class PeriodRepository {
 
   getGradeCount(id) {
     const periodFilter = id === "all" ? "" : "WHERE year_period.period_id = ?";
-    const query = this.db.prepare(`
-      SELECT grade.value IS NOT NULL as "loaded", COUNT(*) as count
+
+    const totalQuery = this.db.prepare(`
+      WITH students_per_year AS (
+        SELECT class.year_period_id as yearPeriodId, SUM(class.student_count) as studentCount
+        FROM class
+        JOIN year_period ON year_period.id = class.year_period_id
+        ${periodFilter.length ? periodFilter + " AND" : "WHERE"} class.id <> "z"
+        GROUP BY 1
+      ), subjects_per_year AS (
+        SELECT year_subject.year_period_id as yearPeriodId, COUNT(*) as subjectCount
+        FROM year_subject
+        JOIN year_period ON year_period.id = year_subject.year_period_id
+        ${periodFilter}
+        GROUP BY 1
+      )
+      SELECT COALESCE(SUM(gradeCount), 0) as total FROM (
+        SELECT subjectCount * studentCount * 3 * ${GRADE_SLOTS_PER_TERM} as gradeCount
+        FROM subjects_per_year
+        JOIN students_per_year ON students_per_year.yearPeriodId = subjects_per_year.yearPeriodId
+      )
+    `);
+    const total = (id === "all" ? totalQuery.all() : totalQuery.all(id, id))[0].total;
+
+    const loadedQuery = this.db.prepare(`
+      SELECT COUNT(*) as loaded
       FROM grade
       JOIN year_subject ON year_subject.id = grade.year_subject_id
       JOIN year_period ON year_period.id = year_subject.year_period_id
-      ${periodFilter}
-      GROUP BY 1
-    `);
-    const results = id === "all" ? query.all() : query.all(id);
-    return results;
+      ${id === "all" ? "WHERE" : periodFilter + " AND"} grade.value IS NOT NULL
+      `)
+    const loaded = (id === "all" ? loadedQuery.all() : loadedQuery.all(id))[0].loaded
+
+    return {total, loaded};
   }
 
   assignYear(yearId, periodId) {

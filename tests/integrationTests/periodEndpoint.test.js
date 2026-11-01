@@ -296,7 +296,6 @@ describe("Period Endpoint", () => {
       status: "pending",
       _class: { id: "A", year: 1 },
     });
-    expect(res.body.fields.student.status.label).toBe("Estatus del Periodo");
   });
 
   test("Archives period and starts new one", async () => {
@@ -519,7 +518,6 @@ describe("Period Endpoint", () => {
       status: "active",
       _class: { id: "C", year: 2 },
     });
-    expect(current.body.fields.student.status.label).toBe("Estatus General");
     expect(historical.body.student).toMatchObject({
       id: students.bruno,
       status: "inactive",

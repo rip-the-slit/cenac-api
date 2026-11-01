@@ -137,8 +137,8 @@ class PeriodService {
     this.isPeriod(period);
 
     const gradeCount = this.periodRepository.getGradeCount(id);
-    const loadedGrades = gradeCount.find((g) => g.loaded === 1)?.count || 0;
-    const notLoadedGrades = gradeCount.find((g) => g.loaded === 0)?.count || 0;
+    const loadedGrades = gradeCount.loaded;
+    const totalGrades = gradeCount.total;
 
     const studentCount = this.periodRepository.getStudentCount(id);
     const totalStudents = studentCount.reduce((t, c) => t + c.count, 0);
@@ -149,7 +149,7 @@ class PeriodService {
       period.status === "new"
         ? null
         : new PeriodStats(
-            loadedGrades + notLoadedGrades,
+            totalGrades,
             loadedGrades,
             totalStudents,
             passedStudents
