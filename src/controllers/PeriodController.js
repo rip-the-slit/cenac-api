@@ -143,7 +143,7 @@ class PeriodController {
 
   getClassSuggestions(req, res) {
     try {
-      const data = this.studentService.getClassSuggestions();
+      const data = this.studentService.getClassSuggestions(req.query.studentId);
       res.json(data);
     } catch (e) {
       res.status(e.status || 500).json({ error: e.message });

@@ -184,7 +184,12 @@ class StudentService {
     return Array.from(students.values());
   }
 
-  getStudentsByPeriod(periodId, filters = {}, includeGuardians = true) {
+  getStudentsByPeriod(
+    periodId,
+    filters = {},
+    includeGuardians = true,
+    deduplicate
+  ) {
     if (periodId !== "all") {
       const period = this.periodRepository.findById(periodId);
       this.isPeriod(period);
@@ -212,7 +217,8 @@ class StudentService {
       this.studentRepository.findAllByPeriod(periodId, {
         filters: sanitizedFilters,
         pagination,
-        deduplicate: periodId === "all",
+        deduplicate:
+          typeof deduplicate === "boolean" ? deduplicate : periodId === "all",
         includeGuardians,
       });
 
@@ -223,6 +229,7 @@ class StudentService {
       birthDate: student.birthDate,
       birthPlace: student.birthPlace,
       status: student.status,
+      periodId: student.periodId,
       _class: student.className
         ? { id: student.className, year: student.yearId }
         : null,
@@ -270,7 +277,10 @@ class StudentService {
     return {
       student,
       fields: {
-        student: getStudentFields({ allPeriods: periodId === "all", editor: true }),
+        student: getStudentFields({
+          allPeriods: periodId === "all",
+          editor: true,
+        }),
         guardian: getGuardianFields(),
       },
     };
@@ -440,12 +450,29 @@ class StudentService {
     return suggestions;
   }
 
-  getClassSuggestions() {
+  getClassSuggestions(studentId) {
+    const studentEnrollments =
+      typeof studentId === "string"
+        ? this.getStudentsByPeriod("all", { id: studentId }, false, false)
+        : null;
+
     const sourcePeriod = this.periodRepository
       .findAll()
-      .find((period) => period.status === "archived");
+      .find(
+        (period) =>
+          period.status === "archived" &&
+          (studentEnrollments
+            ? studentEnrollments.rows.find(
+                ({ periodId }) => periodId === period.id
+              )
+            : true)
+      );
     const sourcePeriodStudents = sourcePeriod
-      ? this.getStudentsByPeriod(sourcePeriod.id, {}, true)
+      ? this.getStudentsByPeriod(
+          sourcePeriod.id,
+          studentEnrollments ? { id: studentId } : {},
+          true
+        )
       : { rows: [] };
     const filterData = sourcePeriod
       ? this.periodService.getPeriodFilterData(sourcePeriod.id, {

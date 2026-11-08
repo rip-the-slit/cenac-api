@@ -11,6 +11,7 @@ const students = {
   bruno: "V-10000002",
   carla: "V-10000003",
   diego: "V-10000004",
+  elena: "V-10000005",
 };
 
 const periodGuardians = [
@@ -35,6 +36,14 @@ const periodGuardians = [
 ];
 
 const periodStudents = [
+  {
+    id: students.elena,
+    firstName: "Elena",
+    lastName: "Espinoza",
+    birthDate: "2012-03-12",
+    birthPlace: "Caracas",
+    _class: { id: "A", year: 1 },
+  },
   {
     id: students.ana,
     firstName: "Ana",
@@ -157,7 +166,7 @@ describe("Period Endpoint", () => {
         ({ name, studentCount, yearId }) => ({ name, studentCount, yearId })
       )
     ).toEqual([
-      { name: "A", studentCount: 1, yearId: 1 },
+      { name: "A", studentCount: 2, yearId: 1 },
       { name: "B", studentCount: 1, yearId: 1 },
       { name: "A", studentCount: 1, yearId: 2 },
     ]);
@@ -173,7 +182,7 @@ describe("Period Endpoint", () => {
     expect(res.body[1][0]).toMatchObject({
       id: expect.any(Number),
       name: "A",
-      studentCount: 1,
+      studentCount: 2,
       yearPeriodId: expect.any(Number),
       yearId: 1,
       periodId: PERIOD_ID,
@@ -213,18 +222,19 @@ describe("Period Endpoint", () => {
         _class: { id: expect.any(String), year: expect.any(Number) },
       })
     );
-    expect(res.body.rows).toHaveLength(3);
+    expect(res.body.rows).toHaveLength(4);
     expect(res.body.years).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: 1, abbr: "1er" }),
         expect.objectContaining({ id: 2, abbr: "2do" }),
       ])
     );
-    expect(res.body.recordsAmount).toBe(3);
+    expect(res.body.recordsAmount).toBe(4);
     expect(res.body.rows.map(({ id }) => id)).toEqual([
       students.ana,
       students.bruno,
       students.carla,
+      students.elena,
     ]);
     expect(res.body.rows).toEqual(
       expect.arrayContaining([
@@ -256,10 +266,10 @@ describe("Period Endpoint", () => {
     [
       "pending",
       { status: "pending" },
-      [students.ana, students.bruno, students.carla],
-      3,
+      [students.ana, students.bruno, students.carla, students.elena],
+      4,
     ],
-    ["page", { page: 2, limit: 2 }, [students.carla], 3],
+    ["page", { page: 2, limit: 2 }, [students.carla, students.elena], 4],
   ])(
     "Filters students by %s",
     async (_filter, query, expectedIds, recordsAmount) => {
@@ -330,7 +340,7 @@ describe("Period Endpoint", () => {
       .send({
         students: [
           {
-            ...periodStudents[0],
+            ...periodStudents.find(({ id }) => id === students.ana),
             _class: { id: "C", year: 2 },
           },
           {
@@ -364,7 +374,19 @@ describe("Period Endpoint", () => {
         lastName: "Benitez",
         _class: expect.objectContaining({ id: "B", year: 2 }),
       }),
+      expect.objectContaining({
+        id: students.elena,
+        _class: expect.objectContaining({ id: "A", year: 2 }),
+      }),
     ]);
+    expect(res.body.students).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: students.elena,
+          _class: expect.objectContaining({ id: "A", year: 2 }),
+        }),
+      ])
+    );
     expect(res.body.students).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ id: students.carla })])
     );
@@ -441,7 +463,7 @@ describe("Period Endpoint", () => {
       userId: null,
       stats: {
         grades: { total: 0, loaded: 0 },
-        students: { total: 5, passed: 0 },
+        students: { total: 6, passed: 0 },
       },
     });
   });
@@ -449,7 +471,7 @@ describe("Period Endpoint", () => {
   test("Returns unique students with class data from the loaded period", async () => {
     const res = await agent.get(`${ROOT}/all/students`).expect(200);
 
-    expect(res.body.recordsAmount).toBe(4);
+    expect(res.body.recordsAmount).toBe(5);
     expect(res.body.fields.status.label).toBe("Estatus General");
     expect(res.body.statuses).toEqual([
       { value: "active", name: "Activo" },
@@ -460,6 +482,7 @@ describe("Period Endpoint", () => {
       students.bruno,
       students.carla,
       students.diego,
+      students.elena,
     ]);
     expect(res.body.rows).toEqual(
       expect.arrayContaining([
@@ -490,8 +513,13 @@ describe("Period Endpoint", () => {
   test.each([
     ["year", { year: 2 }, [students.ana, students.diego], 2],
     ["class", { class: "C" }, [students.ana], 1],
-    ["status", { status: "inactive" }, [students.bruno, students.carla], 2],
-    ["page", { page: 2, limit: 2 }, [students.carla, students.diego], 4],
+    [
+      "status",
+      { status: "inactive" },
+      [students.bruno, students.carla, students.elena],
+      3,
+    ],
+    ["page", { page: 2, limit: 2 }, [students.carla, students.diego], 5],
   ])(
     "Filters all-period students by %s after deduplication",
     async (_filter, query, expectedIds, recordsAmount) => {
@@ -558,5 +586,26 @@ describe("Period Endpoint", () => {
 
     expect(res.body[1].map(({ name }) => name)).toEqual(["A", "B"]);
     expect(res.body[2].map(({ name }) => name)).toEqual(["C", "D"]);
+  });
+
+  it("Returns suggestion for individual student based on last active year", async () => {
+    await agent
+      .post(`${ROOT}/2026/archive`)
+      .send({ supersede: true })
+      .expect(200);
+
+    const res = await agent
+      .get(`${ROOT}/suggestions`)
+      .query({ studentId: students.elena })
+      .expect(200);
+
+      expect(res.body.students).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: students.elena,
+            _class: expect.objectContaining({ id: "A", year: 2 }),
+          }),
+        ])
+      );
   });
 });
