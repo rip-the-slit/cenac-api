@@ -421,7 +421,6 @@ describe("Period Endpoint", () => {
             label: "Nombres",
             type: "text",
             required: true,
-            maxLength: 80,
           },
           lastName: { label: "Apellidos", type: "text", required: true },
           birthDate: {

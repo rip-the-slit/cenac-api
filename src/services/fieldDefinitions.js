@@ -1,5 +1,13 @@
+const MAX_STUDENT_AGE = 18;
+const MIN_STUDENT_AGE = 12;
+const MIN_GUARDIAN_AGE = 18;
+
 export function getStudentFields({ editor = false, allPeriods = false } = {}) {
-  const today = new Date().toISOString().slice(0, 10);
+  const minBirthDate = new Date()
+  minBirthDate.setMonth(minBirthDate.getMonth() - (12 * MAX_STUDENT_AGE));
+  const maxBirthDate = new Date()
+  maxBirthDate.setMonth(maxBirthDate.getMonth() - (12 * MIN_STUDENT_AGE));
+
   const fields = {
     id: { label: "Cédula", type: "text", placeholder: "Ej: V-10000001" },
     firstName: { label: "Nombres", type: "text", placeholder: "Ej: Ana María" },
@@ -8,14 +16,17 @@ export function getStudentFields({ editor = false, allPeriods = false } = {}) {
       label: "Fecha de Nacimiento",
       type: editor ? "date" : "text",
       placeholder: "Ej: 2010-05-15",
-      max: today,
+      min: minBirthDate.toISOString().slice(0, 10),
+      max: maxBirthDate.toISOString().slice(0, 10),
     },
     birthPlace: { label: "Lugar de Nacimiento", type: "text", placeholder: "Ej: Venezuela, Ej: Guárico, Ej: Municipio Leonardo Infante" },
   };
   if (editor) {
     for (const field of Object.values(fields)) field.required = true;
-    fields.firstName.maxLength = 80;
-    fields.lastName.maxLength = 80;
+    fields.firstName.maxLength = 50;
+    fields.firstName.minLength = 4;
+    fields.lastName.maxLength = 50;
+    fields.lastName.minLength = 4;
     return fields;
   }
   return {
@@ -38,12 +49,13 @@ export function getStudentFields({ editor = false, allPeriods = false } = {}) {
 }
 
 export function getGuardianFields({ editor = true } = {}) {
-  const today = new Date().toISOString().slice(0, 10);
+  const maxBirthDate = new Date()
+  maxBirthDate.setMonth(maxBirthDate.getMonth() - (12 * MIN_GUARDIAN_AGE));
   const fields = {
     id: { label: "Cédula", type: "text", required: true, placeholder: "Ej: V-20000001" },
-    firstName: { label: "Nombres", type: "text", required: true, maxLength: 80, placeholder: "Ej: María Elena" },
-    lastName: { label: "Apellidos", type: "text", required: true, maxLength: 80, placeholder: "Ej: Pérez García" },
-    birthDate: { label: "Fecha de Nacimiento", type: "date", max: today, placeholder: "Ej: 1985-03-20" },
+    firstName: { label: "Nombres", type: "text", required: true, minLength: 4, maxLength: 50, placeholder: "Ej: María Elena" },
+    lastName: { label: "Apellidos", type: "text", required: true, minLength: 4, maxLength: 50, placeholder: "Ej: Pérez García" },
+    birthDate: { label: "Fecha de Nacimiento", type: "date", max: maxBirthDate.toISOString().slice(0, 10), placeholder: "Ej: 1985-03-20" },
     legalRole: {
       label: "Rol Legal",
       type: "select",
@@ -62,7 +74,7 @@ export function getGuardianFields({ editor = true } = {}) {
       pattern: "^(?=(?:\\D*\\d){7,15}\\D*$)\\+?[0-9\\s().-]+$",
       placeholder: "Ej: 0412-1234567",
     },
-    address: { label: "Dirección de Domicilio", type: "text", placeholder: "Ej: Av. Bolívar, casa 12, Caracas" },
+    address: { label: "Dirección de Domicilio", type: "text", placeholder: "Ej: Av. Bolívar, casa 12, Caracas", minLength: 4, maxLength: 80 },
     assignedStudents: { label: "Estudiantes Asignados", type: "text", placeholder: "Ej: Ana Pérez" },
   };
   if (!editor) {
