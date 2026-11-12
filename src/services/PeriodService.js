@@ -242,7 +242,7 @@ class PeriodService {
       this.isPeriod(period);
 
       if (period.status !== "new") {
-        return { loaded: false, reason: "already_loaded" };
+        throw new Error("Periodo ya cargado");
       }
 
       const studentsToLoad = Array.isArray(students) ? students : [];
