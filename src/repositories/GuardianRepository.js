@@ -76,10 +76,13 @@ class GuardianRepository {
     addFilter(
       filters.q,
       `(
-        LOWER(guardian.first_name || ' ' || guardian.last_name) LIKE ?
-        OR LOWER(guardian.id) LIKE ?
+        LOWER(guardian.last_name || ' ' || guardian.first_name) LIKE ? OR 
+        LOWER(guardian.last_name || ' ' || guardian.first_name) LIKE ? OR
+        LOWER(guardian.first_name || ' ' || guardian.last_name) LIKE ? OR
+        LOWER(guardian.first_name || ' ' || guardian.last_name) LIKE ? OR
+        LOWER(guardian.id) LIKE ?
       )`,
-      (item) => [`%${item}%`, `%${item}%`]
+      (item) => [`${item}%`, `% ${item}%`, `${item}%`, `% ${item}%`, `%${item}%`]
     );
 
     const studentConditions = [
@@ -116,10 +119,13 @@ class GuardianRepository {
     addStudentFilter(
       filters.studentQ,
       `(
-        LOWER(student_filter.first_name || ' ' || student_filter.last_name) LIKE ?
-        OR LOWER(student_filter.id) LIKE ?
+        LOWER(student_filter.last_name || ' ' || student_filter.first_name) LIKE ? OR 
+        LOWER(student_filter.last_name || ' ' || student_filter.first_name) LIKE ? OR
+        LOWER(student_filter.first_name || ' ' || student_filter.last_name) LIKE ? OR
+        LOWER(student_filter.first_name || ' ' || student_filter.last_name) LIKE ? OR
+        LOWER(student_filter.id) LIKE ?
       )`,
-      (item) => [`%${item}%`, `%${item}%`]
+      (item) => [`${item}%`, `% ${item}%`, `${item}%`, `% ${item}%`, `%${item}%`]
     );
 
     const hasStudentFilters = studentConditions.length > 1;
