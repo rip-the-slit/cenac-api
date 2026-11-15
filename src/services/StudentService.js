@@ -254,7 +254,11 @@ class StudentService {
     }
 
     const student = this.studentRepository.findById(studentId);
-    if (!student) throw new Error("Estudiante no registrado");
+    if (!student) {
+      const error = new Error("Estudiante no registrado");
+      error.status = 404;
+      throw error;
+    }
 
     const { rows } = this.studentRepository.findAllByPeriod(periodId, {
       filters: { id: normalizeQueryValue(studentId) },
