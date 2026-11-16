@@ -21,19 +21,24 @@ CREATE TABLE IF NOT EXISTS subject (
 CREATE TABLE IF NOT EXISTS guardian (
     id TEXT PRIMARY KEY,
     first_name TEXT NOT NULL,
+    first_name_folded TEXT,
     last_name TEXT NOT NULL,
+    last_name_folded TEXT,
     birth_date DATE,
-    legal_role TEXT NOT NULL CHECK(legal_role IN ("Madre", "Padre", "Representante Legal")),
     phone TEXT,
-    address TEXT
+    address TEXT,
+    address_folded TEXT
 );
 
 CREATE TABLE IF NOT EXISTS student (
     id TEXT PRIMARY KEY,
     first_name TEXT NOT NULL,
+    first_name_folded TEXT,
     last_name TEXT NOT NULL,
+    last_name_folded TEXT,
     birth_date DATE,
     birth_place TEXT,
+    birth_place_folded TEXT,
     status TEXT CHECK(status IN ("active", "inactive"))
 );
 
@@ -89,6 +94,7 @@ CREATE TABLE IF NOT EXISTS grade (
 CREATE TABLE IF NOT EXISTS student_guardian (
     student_id TEXT,
     guardian_id TEXT,
+    legal_role TEXT CHECK(legal_role IN ("Madre", "Padre", "Representante Legal")),
     PRIMARY KEY (student_id, guardian_id),
     FOREIGN KEY (student_id) REFERENCES student(id),
     FOREIGN KEY (guardian_id) REFERENCES guardian(id)

@@ -258,6 +258,7 @@ class GradeService {
     }
 
     const sanitizedFilters = {
+      exact: filters.exact,
       id: normalizeQueryValues(filters.id),
       firstName: normalizeQueryValues(filters.firstName),
       lastName: normalizeQueryValues(filters.lastName),

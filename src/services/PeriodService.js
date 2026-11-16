@@ -364,7 +364,7 @@ class PeriodService {
           if (Object.prototype.hasOwnProperty.call(student, "assignedGuardians")) {
             this.studentRepository.syncAssignedGuardians(
               student.id,
-              student.assignedGuardians.map(({ id }) => id)
+              student.assignedGuardians
             );
           }
         }

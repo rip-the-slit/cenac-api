@@ -164,7 +164,7 @@ describe("Guardian Endpoint", () => {
       .get(`${ROOT}/${guardians[0].id}`)
       .expect(200);
 
-    expect(res.body.guardian).toMatchObject(guardians[0]);
+    expect(res.body.guardian).toMatchObject({ ...guardians[0], legalRole: null });
     expect(res.body.guardian.assignedStudents).toHaveLength(2);
     expect(res.body.fields.legalRole).toMatchObject({
       label: "Rol Legal",

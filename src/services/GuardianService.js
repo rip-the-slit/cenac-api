@@ -48,6 +48,7 @@ class GuardianService {
           birthDate: row.assignedStudentBirthDate,
           birthPlace: row.assignedStudentBirthPlace,
           status: row.assignedStudentStatus,
+          legalRole: row.assignedStudentLegalRole,
         });
         studentIds.get(row.id).add(row.assignedStudentId);
       }
@@ -58,6 +59,7 @@ class GuardianService {
 
   getGuardians(periodId = "all", filters = {}, includeStudents = true) {
     const sanitizedFilters = {
+      exact: filters.exact,
       id: normalizeQueryValues(filters.id),
       firstName: normalizeQueryValues(filters.firstName),
       lastName: normalizeQueryValues(filters.lastName),
@@ -117,11 +119,10 @@ class GuardianService {
     if (
       !guardianData?.id ||
       !guardianData.firstName ||
-      !guardianData.lastName ||
-      !guardianData.legalRole
+      !guardianData.lastName
     ) {
       const error = new Error(
-        "La cédula, nombres, apellidos y rol legal son requeridos"
+        "La cédula, nombres y apellidos son requeridos"
       );
       error.status = 400;
       throw error;
@@ -137,7 +138,7 @@ class GuardianService {
       guardianData.firstName,
       guardianData.lastName,
       guardianData.birthDate ?? null,
-      guardianData.legalRole,
+      guardianData.legalRole ?? null,
       guardianData.phone ?? null,
       guardianData.address ?? null
     );

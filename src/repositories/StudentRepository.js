@@ -1,3 +1,4 @@
+import { addNameFilter, fold, updateFolded, isExact } from "./searchUtils.js";
 import db from "../config/db.js";
 import { Class, Guardian, Student } from "../models/index.js";
 
@@ -47,7 +48,7 @@ class StudentRepository {
 
   findAllByClass(classId) {
     const query = this.db.prepare(`
-        SELECT student.id, student.first_name as "firstName", student.last_name as "lastName", student.birth_date as "birthDate", student.birth_place as "birthPlace", student_class.status
+        SELECT student.id, student.first_name as "firstName", student.first_name_folded AS "firstNameFolded", student.last_name as "lastName", student.last_name_folded AS "lastNameFolded", student.birth_date as "birthDate", student.birth_place as "birthPlace", student.birth_place_folded AS "birthPlaceFolded", student_class.status
         FROM student JOIN student_class ON student.id = student_class.student_id
         WHERE student_class.class_id = CAST(? AS INTEGER)
         `);
@@ -82,31 +83,21 @@ class StudentRepository {
       if (values.length === 0) return;
 
       conditions.push(`(${values.map(() => clause).join(" OR ")})`);
-      for (const item of values) params.push(...getParams(item));
+      for (const item of values) params.push(...getParams(fold(item)));
     };
-    const addContainsFilter = (column, value) =>
-      addFilter(value, `LOWER(${column}) LIKE ?`, (item) => [`%${item}%`]);
+    const addContainsFilter = (column, value, key) =>
+      addFilter(value, `LOWER(${column}) ${(isExact(filters.exact, key)) ? "=" : "LIKE"} ?`, (item) => [isExact(filters.exact, key) ? item : `%${item}%`]);
 
-    addFilter(filters.exactIds, "id = ?");
-    addContainsFilter("id", filters.id);
-    addContainsFilter("firstName", filters.firstName);
-    addContainsFilter("lastName", filters.lastName);
-    addContainsFilter("birthDate", filters.dateOfBirth);
-    addContainsFilter("birthPlace", filters.birthPlace);
+    addFilter(filters.exactIds, "LOWER(id) = ?");
+    addContainsFilter("id", filters.id, "id");
+    addContainsFilter("firstNameFolded", filters.firstName, "firstName");
+    addContainsFilter("lastNameFolded", filters.lastName, "lastName");
+    addContainsFilter("birthDate", filters.dateOfBirth, "dateOfBirth");
+    addContainsFilter("birthPlaceFolded", filters.birthPlace, "birthPlace");
     addFilter(filters.yearId, "CAST(yearId AS TEXT) = ?");
     addFilter(filters.className, "LOWER(className) = ?");
     addFilter(filters.status, "LOWER(status) = ?");
-    addFilter(
-      filters.q,
-      `(
-        LOWER(lastName || ' ' || firstName) LIKE ? OR
-        LOWER(lastName || ' ' || firstName) LIKE ? OR
-        LOWER(firstName || ' ' || lastName) LIKE ? OR
-        LOWER(firstName || ' ' || lastName) LIKE ? OR
-        LOWER(id) LIKE ?
-      )`,
-      (item) => [`${item}%`, `% ${item}%`, `${item}%`, `% ${item}%`, `%${item}%`]
-    );
+    addNameFilter(addFilter, filters, "q", "firstNameFolded", "lastNameFolded", "id");
 
     const guardianConditions = [
       "student_guardian_filter.student_id = student_rows.id",
@@ -123,33 +114,15 @@ class StudentRepository {
       if (values.length === 0) return;
 
       guardianConditions.push(`(${values.map(() => clause).join(" OR ")})`);
-      for (const item of values) guardianParams.push(...getParams(item));
+      for (const item of values) guardianParams.push(...getParams(fold(item)));
     };
-    const addGuardianContainsFilter = (column, value) =>
-      addGuardianFilter(value, `LOWER(${column}) LIKE ?`, (item) => [
-        `%${item}%`,
-      ]);
+    const addGuardianContainsFilter = (column, value, key) =>
+      addGuardianFilter(value, `LOWER(${column}) ${(isExact(filters.exact, key)) ? "=" : "LIKE"} ?`, (item) => [isExact(filters.exact, key) ? item : `%${item}%`]);
 
-    addGuardianContainsFilter("guardian_filter.id", filters.guardianId);
-    addGuardianContainsFilter(
-      "guardian_filter.first_name",
-      filters.guardianFirstName
-    );
-    addGuardianContainsFilter(
-      "guardian_filter.last_name",
-      filters.guardianLastName
-    );
-    addGuardianFilter(
-      filters.guardianQ,
-      `(
-        LOWER(guardian_filter.last_name || ' ' || guardian_filter.first_name) LIKE ? OR 
-        LOWER(guardian_filter.last_name || ' ' || guardian_filter.first_name) LIKE ? OR
-        LOWER(guardian_filter.first_name || ' ' || guardian_filter.last_name) LIKE ? OR
-        LOWER(guardian_filter.first_name || ' ' || guardian_filter.last_name) LIKE ? OR
-        LOWER(guardian_filter.id) LIKE ?
-      )`,
-      (item) => [`${item}%`, `% ${item}%`, `${item}%`, `% ${item}%`, `%${item}%`]
-    );
+    addGuardianContainsFilter("guardian_filter.id", filters.guardianId, "guardianId");
+    addGuardianContainsFilter("guardian_filter.first_name_folded", filters.guardianFirstName, "guardianFirstName");
+    addGuardianContainsFilter("guardian_filter.last_name_folded", filters.guardianLastName, "guardianLastName");
+    addNameFilter(addGuardianFilter, filters, "guardianQ", "guardian_filter.first_name_folded", "guardian_filter.last_name_folded", "guardian_filter.id");
 
     if (guardianConditions.length > 1) {
       conditions.push(`EXISTS (
@@ -172,13 +145,14 @@ class StudentRepository {
     periodId,
     {
       filters = {},
+      exact = filters.exact,
       pagination = null,
       deduplicate = false,
       includeGuardians = true,
     } = {}
   ) {
     const shouldDeduplicate = periodId === "all" && deduplicate;
-    const { where, params } = this._getPeriodStudentWhere(periodId, filters);
+    const { where, params } = this._getPeriodStudentWhere(periodId, { ...filters, exact });
     const paginationSql = pagination ? "LIMIT ? OFFSET ?" : "";
     const rowParams = pagination
       ? [...params, pagination.limit, pagination.offset]
@@ -218,10 +192,10 @@ class StudentRepository {
       WITH student_rows AS (
         SELECT
           student.id,
-          student.first_name as "firstName",
-          student.last_name as "lastName",
+          student.first_name as "firstName", student.first_name_folded AS "firstNameFolded",
+          student.last_name as "lastName", student.last_name_folded AS "lastNameFolded",
           student.birth_date as "birthDate",
-          student.birth_place as "birthPlace",
+          student.birth_place as "birthPlace", student.birth_place_folded AS "birthPlaceFolded",
           ${status} as "status",
           ${activePeriodValue("class.id")} as "classDatabaseId",
           ${activePeriodValue("class.name")} as "className",
@@ -262,7 +236,7 @@ class StudentRepository {
         guardian.first_name as "assignedGuardianFirstName",
         guardian.last_name as "assignedGuardianLastName",
         guardian.birth_date as "assignedGuardianBirthDate",
-        guardian.legal_role as "assignedGuardianLegalRole",
+        student_guardian.legal_role as "assignedGuardianLegalRole",
         guardian.phone as "assignedGuardianPhone",
         guardian.address as "assignedGuardianAddress"`
       : "";
@@ -298,34 +272,42 @@ class StudentRepository {
   }
 
   create(student) {
-    const query = this.db.prepare(`
-        INSERT INTO student (id, first_name, last_name, birth_date, birth_place, status)
-        VALUES (?, ?, ?, ?, ?, ?)
-        `);
-    return query.run(
-      student.id,
-      student.firstName,
-      student.lastName,
-      student.birthDate,
-      student.birthPlace,
-      student.status
-    );
+    return this.db.transaction(() => {
+      const query = this.db.prepare(`
+          INSERT INTO student (id, first_name, last_name, birth_date, birth_place, status)
+          VALUES (?, ?, ?, ?, ?, ?)
+          `);
+      const result = query.run(
+        student.id,
+        student.firstName,
+        student.lastName,
+        student.birthDate,
+        student.birthPlace,
+        student.status
+      );
+      updateFolded(this.db, "student", student.id, ["first_name", "last_name", "birth_place"], { first_name: student.firstName, last_name: student.lastName, birth_place: student.birthPlace });
+      return result;
+    });
   }
 
   update(id, studentData) {
-    const query = this.db.prepare(`
-        UPDATE student
-        SET first_name = ?, last_name = ?, birth_date = ?, birth_place = ?, status = ?
-        WHERE id = ?
-        `);
-    return query.run(
-      studentData.firstName,
-      studentData.lastName,
-      studentData.birthDate,
-      studentData.birthPlace,
-      studentData.status,
-      id
-    );
+    return this.db.transaction(() => {
+      const query = this.db.prepare(`
+          UPDATE student
+          SET first_name = ?, last_name = ?, birth_date = ?, birth_place = ?, status = ?
+          WHERE id = ?
+          `);
+      const result = query.run(
+        studentData.firstName,
+        studentData.lastName,
+        studentData.birthDate,
+        studentData.birthPlace,
+        studentData.status,
+        id
+      );
+      updateFolded(this.db, "student", id, ["first_name", "last_name", "birth_place"], { first_name: studentData.firstName, last_name: studentData.lastName, birth_place: studentData.birthPlace });
+      return result;
+    });
   }
 
   updateStatusByPeriod(periodId, status) {
@@ -348,18 +330,23 @@ class StudentRepository {
     return query.run(id);
   }
 
-  assignGuardian(studentId, guardianId) {
+  assignGuardian(studentId, guardianId, legalRole = null) {
+    if (legalRole !== null && !["Madre", "Padre", "Representante Legal"].includes(legalRole)) {
+      const error = new Error("Rol legal no válido");
+      error.status = 400;
+      throw error;
+    }
     const query = this.db.prepare(`
-        INSERT INTO student_guardian (student_id, guardian_id)
-        VALUES (?, ?)
-        ON CONFLICT(student_id, guardian_id) DO NOTHING
+        INSERT INTO student_guardian (student_id, guardian_id, legal_role)
+        VALUES (?, ?, ?)
+        ON CONFLICT(student_id, guardian_id) DO UPDATE SET legal_role = excluded.legal_role
         `);
-    return query.run(studentId, guardianId);
+    return query.run(studentId, guardianId, legalRole);
   }
 
   findAllAssignedGuardians(studentId) {
     const query = this.db
-      .prepare(`SELECT guardian.id, guardian.first_name as "firstName", guardian.last_name as "lastName", guardian.birth_date as "birthDate", guardian.legal_role as "legalRole", guardian.phone, guardian.address
+      .prepare(`SELECT guardian.id, guardian.first_name as "firstName", guardian.last_name as "lastName", guardian.birth_date as "birthDate", student_guardian.legal_role as "legalRole", guardian.phone, guardian.address
                                   FROM guardian JOIN student_guardian ON guardian.id = student_guardian.guardian_id
                                   WHERE student_guardian.student_id = ?`);
     const results = query.all(studentId);
@@ -377,8 +364,9 @@ class StudentRepository {
     );
   }
 
-  syncAssignedGuardians(studentId, guardianIds) {
-    const uniqueIds = [...new Set(guardianIds.map(String))];
+  syncAssignedGuardians(studentId, guardians) {
+    const roles = new Map(guardians.map(guardian => [String(guardian.id ?? guardian), guardian.legalRole ?? null]));
+    const uniqueIds = [...roles.keys()];
     if (uniqueIds.length === 0) {
       this.db.prepare(
         "DELETE FROM student_guardian WHERE student_id = ?"
@@ -392,7 +380,7 @@ class StudentRepository {
       WHERE student_id = ? AND guardian_id NOT IN (${placeholders})
     `).run(studentId, ...uniqueIds);
     for (const guardianId of uniqueIds) {
-      this.assignGuardian(studentId, guardianId);
+      this.assignGuardian(studentId, guardianId, roles.get(guardianId));
     }
   }
 

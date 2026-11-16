@@ -88,7 +88,7 @@ class StudentService {
       if (syncGuardians) {
         this.studentRepository.syncAssignedGuardians(
           id,
-          studentData.assignedGuardians.map(({ id: guardianId }) => guardianId)
+          studentData.assignedGuardians
         );
       }
       student.assignedGuardians =
@@ -196,6 +196,7 @@ class StudentService {
     }
 
     const sanitizedFilters = {
+      exact: filters.exact,
       id: normalizeQueryValues(filters.id),
       firstName: normalizeQueryValues(filters.firstName),
       lastName: normalizeQueryValues(filters.lastName),
@@ -261,7 +262,7 @@ class StudentService {
     }
 
     const { rows } = this.studentRepository.findAllByPeriod(periodId, {
-      filters: { id: normalizeQueryValue(studentId) },
+      filters: { id: normalizeQueryValue(studentId), exact: { id: true } },
       deduplicate: periodId === "all",
       includeGuardians: true,
     });
@@ -457,7 +458,7 @@ class StudentService {
   getClassSuggestions(studentId) {
     const studentEnrollments =
       typeof studentId === "string"
-        ? this.getStudentsByPeriod("all", { id: studentId }, false, false)
+        ? this.getStudentsByPeriod("all", { id: studentId, exact: { id: true } }, false, false)
         : null;
 
     const sourcePeriod = this.periodRepository
@@ -474,7 +475,7 @@ class StudentService {
     const sourcePeriodStudents = sourcePeriod
       ? this.getStudentsByPeriod(
           sourcePeriod.id,
-          studentEnrollments ? { id: studentId } : {},
+          studentEnrollments ? { id: studentId, exact: { id: true } } : {},
           true
         )
       : { rows: [] };

@@ -68,6 +68,7 @@ class PeriodController {
         guardianFirstName,
         guardianLastName,
         guardianQ,
+        exact,
         page,
         limit,
       } = req.query;
@@ -87,6 +88,7 @@ class PeriodController {
         guardianFirstName,
         guardianLastName,
         guardianQ,
+        exact,
         classId,
         page,
         limit,
